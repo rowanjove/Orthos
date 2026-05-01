@@ -1,0 +1,10 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for LintDrop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "opener:default"
+  ]
+}
