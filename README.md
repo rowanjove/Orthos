@@ -81,16 +81,22 @@ LintDrop focuses on syntax validation and common format repairs. It does not kno
 
 ## Installation / 安装
 
-Download the Windows installer from GitHub Releases:  
-从 GitHub Releases 下载 Windows 安装包：
+Download the Windows version that fits your machine from GitHub Releases:  
+从 GitHub Releases 下载适合你机器的 Windows 版本：
 
 [LintDrop Releases](https://github.com/rowanjove/lintdrop/releases)
 
-Current installer / 当前安装包：
+Current Windows downloads / 当前 Windows 下载项：
 
 ```text
 LintDrop_1.0.3_x64-setup.exe
+LintDrop_1.0.3_x64_portable.exe
 ```
+
+- `LintDrop_1.0.3_x64-setup.exe` — installer build, recommended for older systems or users who want guided setup.  
+  `LintDrop_1.0.3_x64-setup.exe` —— 安装版，适合较老的系统，或希望按安装向导完成配置的用户。
+- `LintDrop_1.0.3_x64_portable.exe` — portable build for Windows 10/11; download and double-click to run.  
+  `LintDrop_1.0.3_x64_portable.exe` —— 免安装版，适合 Windows 10/11；下载后双击即可运行。
 
 ## Development / 开发
 
@@ -117,6 +123,12 @@ Build the Windows installer / 构建 Windows 安装包：
 
 ```bash
 npx tauri build --bundles nsis
+```
+
+Portable executable / 免安装可执行文件：
+
+```text
+src-tauri/target/release/lintdrop.exe
 ```
 
 Build artifacts / 构建产物：
