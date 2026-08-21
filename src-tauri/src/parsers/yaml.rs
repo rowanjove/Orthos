@@ -114,7 +114,7 @@ fn friendly_message(raw: &str) -> String {
 /// 全面的 YAML 修正，覆盖以下错误类型：
 /// 1. Tab 缩进 → 空格
 /// 2. 冒号后缺空格  key:value → key: value
-/// 3. 重复键名删除（保留第一个）
+/// 3. 重复键名保留原样，由校验阶段报告（避免静默丢失配置）
 /// 4. 缩进修正（统一为 2 空格倍数）
 /// 5. 空列表项修正  -  → - null
 /// 6. 流式列表空格  [1,2,3] → [1, 2, 3]
@@ -188,16 +188,14 @@ pub fn simple_fix(content: &str) -> String {
 
     let fixed = result.join("\n");
 
-    // Pass 3: 去重键名
-    let pass3 = remove_duplicate_keys(&fixed);
-
-    // Pass 4: 尝试解析并重新序列化
-    if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(&pass3) {
+    // Pass 3: 尝试解析并重新序列化。重复键等语义冲突不做猜测，
+    // 保留原文并交给校验结果提示用户处理。
+    if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(&fixed) {
         if let Ok(pretty) = serde_yaml::to_string(&val) {
             return pretty;
         }
     }
-    pass3
+    fixed
 }
 
 /// 修正单行 YAML 内容的冒号空格和流式格式
@@ -376,49 +374,6 @@ fn fix_flow_mapping(s: &str) -> Option<String> {
     }
     result.push('}');
     Some(result)
-}
-
-/// 移除重复键名（保留每个映射中的第一个出现）
-fn remove_duplicate_keys(content: &str) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut result = Vec::new();
-    let mut seen_keys: Vec<(i32, String)> = Vec::new();
-
-    for line in &lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            result.push(line.to_string());
-            continue;
-        }
-
-        // 处理列表项中的键值对: - key: value
-        let effective = if let Some(stripped) = trimmed.strip_prefix("- ") {
-            stripped
-        } else {
-            trimmed
-        };
-
-        let indent_level = line.chars().take_while(|c| *c == ' ').count() as i32;
-
-        seen_keys.retain(|(level, _)| *level <= indent_level);
-
-        if let Some(colon_pos) = effective.find(':') {
-            let key = effective[..colon_pos].trim().to_string();
-            if !key.is_empty() && !key.starts_with('{') && !key.starts_with('[') {
-                if seen_keys
-                    .iter()
-                    .any(|(level, k)| *level == indent_level && k == &key)
-                {
-                    continue;
-                }
-                seen_keys.push((indent_level, key));
-            }
-        }
-
-        result.push(line.to_string());
-    }
-
-    result.join("\n")
 }
 
 /// 将前导 Tab 替换为对齐到指定宽度的空格

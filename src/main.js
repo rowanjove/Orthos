@@ -1,6 +1,10 @@
 // LintDrop - Main JavaScript
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
+const tauri = window.__TAURI__;
+const invoke = tauri?.core?.invoke ?? (async () => {
+  throw new Error('请在 LintDrop 桌面应用中使用此功能');
+});
+const listen = tauri?.event?.listen ?? (() => Promise.resolve(() => {}));
+const { computeLCS, MAX_RENDER_LINES } = window.LintDropDiff;
 
 // State
 let currentFiles = {};
@@ -110,12 +114,12 @@ fileInput.addEventListener('change', async () => {
   let totalSize = 0;
   for (const f of files) {
     if (f.size > MAX_FILE_SIZE) {
-      updateStatus(`文件过大，最大支持 10 MB: ${f.name}`, 'error');
+      updateStatus(`这个文件有点大，最多支持 10 MB：${f.name}`, 'error');
       return;
     }
     totalSize += f.size;
     if (totalSize > MAX_BATCH_SIZE) {
-      updateStatus('批量文件总大小超限，最大支持 20 MB', 'error');
+      updateStatus('这批文件有点大，合计最多支持 20 MB', 'error');
       return;
     }
   }
@@ -126,7 +130,7 @@ fileInput.addEventListener('change', async () => {
       const text = await f.text();
       fileContents.push([f.name, text]);
     } catch (err) {
-      updateStatus(`无法读取文件 ${f.name}: ${err.message}`, 'error');
+      updateStatus(`读不了这个文件：${f.name}（${err.message}）`, 'error');
       return;
     }
   }
@@ -157,8 +161,8 @@ document.querySelector('.modal-overlay').addEventListener('click', () => {
 });
 
 btnPasteConfirm.addEventListener('click', async () => {
-  const text = pasteInput.value.trim();
-  if (!text) return;
+  const text = pasteInput.value;
+  if (!text.trim()) return;
 
   const format = pasteFormat.value === 'auto' ? detectFormatFromContent(text) : pasteFormat.value;
   pasteModal.classList.add('hidden');
@@ -179,7 +183,7 @@ async function checkSingleFile(content, filename, format) {
     isBatchMode = false;
     renderSingleResult(filename, result);
   } catch (err) {
-    updateStatus('校验失败: ' + err, 'error');
+    updateStatus('检查没完成：' + err, 'error');
   }
 }
 
@@ -193,7 +197,7 @@ async function checkBatch(files) {
     isBatchMode = true;
     renderBatchUI(batchResults);
   } catch (err) {
-    updateStatus('批量校验失败: ' + err, 'error');
+    updateStatus('批量检查没完成：' + err, 'error');
   }
 }
 
@@ -229,7 +233,7 @@ function renderSingleResult(filename, result) {
   if (result.valid) {
     statusCard.className = 'status-card status-ok';
     statusIcon.textContent = '\u2713';
-    statusText.textContent = `格式正确 \u2014 ${result.format.toUpperCase()} ${filename}`;
+    statusText.textContent = `检查通过 · ${result.format.toUpperCase()} · ${filename}`;
     errorList.classList.add('hidden');
     configureActionButtons(result);
     actionBar.classList.remove('hidden');
@@ -241,8 +245,8 @@ function renderSingleResult(filename, result) {
     statusCard.className = fixable ? 'status-card status-fixable' : 'status-card status-error';
     statusIcon.textContent = fixable ? '!' : '\u2717';
     statusText.textContent = fixable
-      ? `发现 ${result.errors.length} 个格式问题，可自动修正`
-      : `发现 ${result.errors.length} 个格式问题，暂无法自动修正`;
+      ? `发现 ${result.errors.length} 个问题，已经准备好修正`
+      : `发现 ${result.errors.length} 个问题，需要手动处理`;
 
     errorList.classList.remove('hidden');
     errorList.innerHTML = result.errors.map((err) => `
@@ -265,14 +269,14 @@ function renderSingleResult(filename, result) {
     }
   }
 
-  statusBar.textContent = `就绪 | ${result.format.toUpperCase()} | 已校验 ${formatSize(getByteLength(currentFiles[filename] || ''))}`;
+  statusBar.textContent = `${result.format.toUpperCase()} · ${formatSize(getByteLength(currentFiles[filename] || ''))} · 检查完成`;
 }
 
 function configureActionButtons(result) {
   btnCopyErrors.classList.toggle('hidden', result.valid);
   btnSchema.classList.toggle('hidden', result.format !== 'json');
   btnDownload.classList.toggle('hidden', !result.valid && !result.corrected);
-  btnDownload.textContent = result.valid ? '下载原文件' : '下载修正文件';
+  btnDownload.textContent = result.valid ? '保存原文件' : '保存修正文件';
 }
 
 // ---- Render Batch Results ----
@@ -287,7 +291,7 @@ function renderBatchUI(batchResults) {
     const fixable = !ok && Boolean(item.result.corrected);
     const count = item.result.errors.length;
     const statusClass = ok ? 'batch-status-ok' : (fixable ? 'batch-status-fixable' : 'batch-status-err');
-    const statusText = ok ? '\u2713 通过' : (fixable ? `! ${count} 个问题，可修正` : `\u2717 ${count} 个错误`);
+    const statusText = ok ? '\u2713 通过' : (fixable ? `! ${count} 个问题，已准备修正` : `\u2717 ${count} 个问题`);
     return `
       <tr>
         <td title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
@@ -308,14 +312,14 @@ function renderBatchUI(batchResults) {
   const totalErrors = batchResults.reduce((sum, item) => sum + item.result.errors.length, 0);
   const totalOk = batchResults.filter(item => item.result.valid).length;
   const totalFixable = batchResults.filter(item => !item.result.valid && item.result.corrected).length;
-  statusBar.textContent = `批量校验完成 | ${batchResults.length} 个文件 | ${totalOk} 通过 | ${totalFixable} 可修正 | ${totalErrors} 个问题`;
+  statusBar.textContent = `批量检查完成 · ${batchResults.length} 个文件 · ${totalOk} 个通过 · ${totalFixable} 个待修正 · ${totalErrors} 个问题`;
 }
 
 function showBatchDetail(item) {
   batchDetail.classList.remove('hidden');
   batchDetailName.textContent = item.filename;
   if (item.result.valid) {
-    batchDetailErrors.innerHTML = '<div class="error-item"><div class="error-message" style="color:var(--green)">格式正确</div></div>';
+    batchDetailErrors.innerHTML = '<div class="error-item"><div class="error-message" style="color:var(--green)">检查通过</div></div>';
   } else {
     batchDetailErrors.innerHTML = item.result.errors.map(err => `
       <div class="error-item">
@@ -335,6 +339,12 @@ btnBatchDetailClose.addEventListener('click', () => {
 function renderDiff(before, after) {
   const beforeLines = before.split('\n');
   const afterLines = after.split('\n');
+
+  if (beforeLines.length + afterLines.length > MAX_RENDER_LINES) {
+    diffBefore.textContent = `文件较大，已跳过逐行对比（${beforeLines.length.toLocaleString()} 行）`;
+    diffAfter.textContent = `文件较大，已跳过逐行对比（${afterLines.length.toLocaleString()} 行）`;
+    return;
+  }
 
   // LCS 计算最长公共子序列
   const lcs = computeLCS(beforeLines, afterLines);
@@ -375,64 +385,6 @@ function renderDiff(before, after) {
   diffAfter.innerHTML = afterHtml;
 }
 
-function computeLCS(a, b) {
-  const m = a.length, n = b.length;
-  // 对于大文件使用简化算法避免 OOM
-  if (m > 2000 || n > 2000) {
-    return computeLCS_simple(a, b);
-  }
-  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-  // 回溯
-  const result = [];
-  let i = m, j = n;
-  while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      result.unshift(a[i - 1]);
-      i--; j--;
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
-    }
-  }
-  return result;
-}
-
-function computeLCS_simple(a, b) {
-  // 大文件简化：使用贪心匹配保持顺序
-  // 对 b 建立行到索引列表的映射
-  const bIndexMap = new Map();
-  for (let i = 0; i < b.length; i++) {
-    const line = b[i];
-    if (!bIndexMap.has(line)) bIndexMap.set(line, []);
-    bIndexMap.get(line).push(i);
-  }
-  // 贪心匹配：对 a 中每行，找 b 中第一个尚未使用的位置
-  const used = new Array(b.length).fill(false);
-  const result = [];
-  for (const line of a) {
-    const indices = bIndexMap.get(line);
-    if (!indices) continue;
-    for (const idx of indices) {
-      if (!used[idx]) {
-        used[idx] = true;
-        result.push(line);
-        break;
-      }
-    }
-  }
-  return result;
-}
-
 // ---- Actions ----
 btnClose.addEventListener('click', resetAll);
 
@@ -444,9 +396,9 @@ btnCopyErrors.addEventListener('click', async () => {
   ).join('\n');
   try {
     await navigator.clipboard.writeText(text);
-    flashStatus('已复制错误信息');
+    flashStatus('问题已复制');
   } catch {
-    flashStatus('复制失败');
+    flashStatus('复制没成功');
   }
 });
 
@@ -457,7 +409,7 @@ btnCopyRaw.addEventListener('click', async () => {
       await navigator.clipboard.writeText(currentFiles[filename]);
       flashStatus('已复制原文');
     } catch {
-      flashStatus('复制失败');
+      flashStatus('复制没成功');
     }
   }
 });
@@ -489,7 +441,7 @@ btnBatchCopy.addEventListener('click', async () => {
     }).join('\n\n');
   try {
     await navigator.clipboard.writeText(text);
-    flashStatus('已复制全部错误');
+    flashStatus('全部问题已复制');
   } catch {
     flashStatus('复制失败');
   }
@@ -498,7 +450,7 @@ btnBatchCopy.addEventListener('click', async () => {
 btnBatchDownload.addEventListener('click', async () => {
   const items = currentResults.filter(item => item.result.corrected);
   if (items.length === 0) {
-    flashStatus('没有可下载的修正文件');
+    flashStatus('没有可以保存的修正文件');
     return;
   }
   let successCount = 0;
@@ -508,9 +460,9 @@ btnBatchDownload.addEventListener('click', async () => {
     if (ok) successCount++;
   }
   if (successCount === items.length) {
-    flashStatus(`已下载 ${successCount} 个修正文件`);
+    flashStatus(`已保存 ${successCount} 个修正文件`);
   } else {
-    flashStatus(`成功 ${successCount}/${items.length}，部分文件保存失败`);
+    flashStatus(`已保存 ${successCount}/${items.length} 个，部分文件没保存成功`);
   }
 });
 
@@ -526,7 +478,7 @@ function resetAll() {
   singleView.classList.add('hidden');
   batchView.classList.add('hidden');
   batchDetail.classList.add('hidden');
-  statusBar.textContent = '就绪';
+  statusBar.textContent = '准备好了';
 }
 
 function updateStatus(msg, type) {
@@ -690,7 +642,7 @@ btnSchemaConfirm.addEventListener('click', async () => {
     schemaResult.classList.remove('hidden');
     if (result.valid) {
       schemaResult.className = 'schema-result schema-ok';
-      schemaResult.textContent = 'Schema 校验通过';
+      schemaResult.textContent = 'Schema 检查通过';
     } else {
       schemaResult.className = 'schema-result schema-error';
       schemaResult.innerHTML = result.errors.map((err) => `
@@ -704,7 +656,7 @@ btnSchemaConfirm.addEventListener('click', async () => {
   } catch (err) {
     schemaResult.className = 'schema-result schema-error';
     schemaResult.classList.remove('hidden');
-    schemaResult.textContent = 'Schema 校验失败: ' + err;
+    schemaResult.textContent = 'Schema 检查没完成：' + err;
   }
 });
 
@@ -715,8 +667,8 @@ btnBrowse.addEventListener('click', async () => {
   };
 
   try {
-    if (window.__TAURI__.dialog?.open) {
-      const dir = await window.__TAURI__.dialog.open({
+    if (tauri?.dialog?.open) {
+      const dir = await tauri.dialog.open({
         directory: true,
         title: '选择保存位置'
       });

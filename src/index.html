@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LintDrop - 格式检查器</title>
+  <title>LintDrop - 配置检查</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,9 +14,9 @@
     </div>
     <div class="header-text">
       <h1>LintDrop</h1>
-      <p class="subtitle">极轻量配置文件格式检查器</p>
+      <p class="subtitle">检查配置，改完再保存</p>
     </div>
-    <button id="btn-about" class="btn btn-outline btn-sm header-about">About / 关于</button>
+    <button id="btn-about" class="btn btn-outline btn-sm header-about">关于</button>
   </header>
 
   <!-- Drop Zone -->
@@ -28,9 +28,9 @@
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
     </div>
-    <p class="drop-text">拖入文件，或点击选择</p>
-    <p class="drop-hint">— 或者 —</p>
-    <button id="btn-paste" class="btn btn-outline">粘贴文本</button>
+    <p class="drop-text">把文件拖到这里</p>
+    <p class="drop-hint">也可以点击选择，或直接粘贴一段内容</p>
+    <button id="btn-paste" class="btn btn-outline">粘贴一段配置</button>
     <div class="format-badges">
       <span class="badge">JSON</span>
       <span class="badge">YAML</span>
@@ -48,10 +48,10 @@
   <div id="paste-modal" class="modal hidden">
     <div class="modal-overlay"></div>
     <div class="modal-content">
-      <h3>粘贴文本</h3>
-      <textarea id="paste-input" rows="10" placeholder="在此粘贴内容..."></textarea>
+      <h3>粘贴一段配置</h3>
+      <textarea id="paste-input" rows="10" placeholder="把 JSON、YAML、TOML 等内容粘贴到这里"></textarea>
       <div class="modal-row">
-        <label>格式：</label>
+        <label>按格式检查：</label>
         <select id="paste-format">
           <option value="auto">自动检测</option>
           <option value="json">JSON</option>
@@ -65,7 +65,7 @@
       </div>
       <div class="modal-actions">
         <button id="btn-paste-cancel" class="btn btn-outline">取消</button>
-        <button id="btn-paste-confirm" class="btn btn-primary">开始检查</button>
+        <button id="btn-paste-confirm" class="btn btn-primary">检查这段内容</button>
       </div>
     </div>
   </div>
@@ -74,7 +74,7 @@
   <div id="download-modal" class="modal hidden">
     <div class="modal-overlay" id="download-overlay"></div>
     <div class="modal-content">
-      <h3>保存文件</h3>
+      <h3>保存修正后的文件</h3>
       <div class="modal-row">
         <label>文件名：</label>
         <input type="text" id="download-filename" class="input" style="flex:1">
@@ -82,9 +82,9 @@
       <div class="modal-row" style="margin-top:8px">
         <label>保存到：</label>
         <input type="text" id="download-path" class="input" style="flex:1" placeholder="例如: %USERPROFILE%\Desktop">
-        <button id="btn-browse" class="btn btn-outline btn-sm">浏览</button>
+        <button id="btn-browse" class="btn btn-outline btn-sm">选择文件夹</button>
       </div>
-      <p class="drop-hint" style="margin-top:8px;font-size:11px">留空则保存到桌面</p>
+      <p class="drop-hint" style="margin-top:8px;font-size:11px">不填保存位置，就放到桌面</p>
       <div class="modal-actions">
         <button id="btn-download-cancel" class="btn btn-outline">取消</button>
         <button id="btn-download-confirm" class="btn btn-primary">保存</button>
@@ -96,12 +96,12 @@
   <div id="schema-modal" class="modal hidden">
     <div class="modal-overlay" id="schema-overlay"></div>
     <div class="modal-content">
-      <h3>JSON Schema 校验</h3>
-      <textarea id="schema-input" rows="9" placeholder="在此粘贴 JSON Schema..."></textarea>
+      <h3>用 JSON Schema 继续检查</h3>
+      <textarea id="schema-input" rows="9" placeholder="把 JSON Schema 粘贴到这里"></textarea>
       <div id="schema-result" class="schema-result hidden"></div>
       <div class="modal-actions">
         <button id="btn-schema-cancel" class="btn btn-outline">取消</button>
-        <button id="btn-schema-confirm" class="btn btn-primary">开始校验</button>
+        <button id="btn-schema-confirm" class="btn btn-primary">运行检查</button>
       </div>
     </div>
   </div>
@@ -110,20 +110,20 @@
   <div id="about-modal" class="modal hidden">
     <div class="modal-overlay" id="about-overlay"></div>
     <div class="modal-content about-content">
-      <h3>About LintDrop / 关于 LintDrop</h3>
+      <h3>关于 LintDrop</h3>
       <section>
         <h4>中文</h4>
-        <p>LintDrop 是一款轻量、离线的桌面格式检查器，专注于日常配置文件的快速校验和常见语法问题修复。</p>
-        <p>支持 JSON、YAML、TOML、XML、CSV、INI、ENV。你可以拖拽文件或粘贴文本，查看行列级错误定位、中文提示、Diff 对比，并按需保存修正结果。</p>
+        <p>LintDrop 只做一件事：帮你尽快确认配置文件能不能解析。</p>
+        <p>把文件拖进来，或粘贴一段内容；它会指出具体位置，提供安全的修正建议。原文件不会被覆盖。</p>
       </section>
       <section>
         <h4>English</h4>
-        <p>LintDrop is a lightweight, offline desktop format checker for quick validation and repair of everyday configuration files.</p>
-        <p>It supports JSON, YAML, TOML, XML, CSV, INI, and ENV. Drop files or paste text to review line-level diagnostics, compare diffs, and save repaired content when ready.</p>
+        <p>LintDrop answers one practical question: can this configuration be parsed?</p>
+        <p>Drop a file or paste a snippet to see what needs attention. Your original file stays untouched until you choose to save a fix.</p>
       </section>
-      <p class="about-version">Version / 版本: 1.0.3</p>
+      <p class="about-version">版本 1.0.3 · 离线运行</p>
       <div class="modal-actions">
-        <button id="btn-about-close" class="btn btn-primary">OK</button>
+        <button id="btn-about-close" class="btn btn-primary">知道了</button>
       </div>
     </div>
   </div>
@@ -149,20 +149,20 @@
 
       <!-- Action Buttons -->
       <div id="action-bar" class="action-bar">
-        <button id="btn-copy-errors" class="btn btn-outline btn-sm">复制错误信息</button>
+        <button id="btn-copy-errors" class="btn btn-outline btn-sm">复制问题</button>
         <button id="btn-copy-raw" class="btn btn-outline btn-sm">复制原文</button>
-        <button id="btn-schema" class="btn btn-outline btn-sm">Schema 校验</button>
-        <button id="btn-download" class="btn btn-primary btn-sm">下载修正文件</button>
+        <button id="btn-schema" class="btn btn-outline btn-sm">Schema 检查</button>
+        <button id="btn-download" class="btn btn-primary btn-sm">保存修正文件</button>
       </div>
 
       <!-- Diff Panel -->
       <div id="diff-panel" class="diff-panel hidden">
         <div class="diff-header">
-          <span>修正前后对比</span>
+          <span>改动预览</span>
         </div>
         <div class="diff-body">
           <div class="diff-col">
-            <div class="diff-col-header">修正前</div>
+            <div class="diff-col-header">原文</div>
             <pre id="diff-before" class="diff-code"></pre>
           </div>
           <div class="diff-col">
@@ -184,11 +184,11 @@
     <!-- Batch mode -->
     <div id="batch-view" class="hidden">
       <div class="batch-header">
-        <h3>批量校验结果</h3>
+        <h3>批量检查结果</h3>
         <div class="batch-actions">
-          <button id="btn-batch-copy" class="btn btn-outline btn-sm">复制全部错误</button>
-          <button id="btn-batch-download" class="btn btn-primary btn-sm">下载全部修正</button>
-          <button id="btn-batch-clear" class="btn btn-outline btn-sm">清空全部</button>
+          <button id="btn-batch-copy" class="btn btn-outline btn-sm">复制全部问题</button>
+          <button id="btn-batch-download" class="btn btn-primary btn-sm">保存全部修正</button>
+          <button id="btn-batch-clear" class="btn btn-outline btn-sm">清空列表</button>
         </div>
       </div>
       <table class="batch-table">
@@ -215,9 +215,10 @@
 
   <!-- Status Bar -->
   <footer id="status-bar" class="status-bar">
-    <span>就绪</span>
+    <span>准备好了</span>
   </footer>
 
+  <script src="diff.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

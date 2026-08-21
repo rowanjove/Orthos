@@ -87,7 +87,7 @@ fn count_fields(line: &str) -> usize {
 }
 
 /// 全面的 CSV 修正，覆盖以下错误类型：
-/// 1. 列数不齐 → 补齐或截断
+/// 1. 缺少字段 → 补齐；多余字段保持原样，避免静默丢失数据
 /// 2. BOM 移除（UTF-8 BOM: EF BB BF）
 /// 3. 行尾符统一（CRLF → LF）
 /// 4. 未闭合引号补全
@@ -110,8 +110,8 @@ pub fn simple_fix(content: &str) -> String {
     // Pass 5: 检测并修正错误分隔符（尊重引号内容）
     let pass5 = fix_wrong_delimiter(&pass4);
 
-    // Pass 6: 列数对齐（自动处理多余/缺少的逗号）
-    align_columns(&pass5)
+    // Pass 6: 仅补齐缺少字段，不截断多余字段
+    pad_missing_columns(&pass5)
 }
 
 /// 修正未闭合的引号
@@ -245,8 +245,8 @@ fn fix_wrong_delimiter(content: &str) -> String {
     result
 }
 
-/// 列数对齐（补齐或截断到表头列数）
-fn align_columns(content: &str) -> String {
+/// 补齐缺少字段，但保留多余字段，避免修复过程丢失数据。
+fn pad_missing_columns(content: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() {
         return content.to_string();
@@ -264,35 +264,6 @@ fn align_columns(content: &str) -> String {
             let mut fixed = line.to_string();
             for _ in 0..(header_count - count) {
                 fixed.push(',');
-            }
-            result.push(fixed);
-        } else if count > header_count {
-            let mut in_quotes = false;
-            let mut field_count = 0;
-            let mut chars_iter = line.chars().peekable();
-            let mut fixed = String::new();
-            while let Some(ch) = chars_iter.next() {
-                match ch {
-                    '"' => {
-                        if in_quotes && chars_iter.peek() == Some(&'"') {
-                            fixed.push(ch);
-                            if let Some(escaped) = chars_iter.next() {
-                                fixed.push(escaped);
-                            }
-                            continue;
-                        } else {
-                            in_quotes = !in_quotes;
-                        }
-                    }
-                    ',' if !in_quotes => {
-                        field_count += 1;
-                        if field_count >= header_count {
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-                fixed.push(ch);
             }
             result.push(fixed);
         } else {
