@@ -4,7 +4,7 @@
   "description": "极轻量配置文件格式检查器",
   "scripts": {
     "tauri": "tauri",
-    "test:frontend": "node --test test/frontend-*.test.js",
+    "test:frontend": "node --test test/frontend-diff.test.js test/frontend-shell.test.js",
     "benchmark:rust": "cargo bench --manifest-path src-tauri/Cargo.toml --bench parser_bench",
     "check:frontend": "npm run test:frontend && node --check src/main.js && node --check src/diff.js",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --all-targets && cargo check --manifest-path src-tauri/Cargo.toml",
