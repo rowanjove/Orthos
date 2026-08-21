@@ -204,10 +204,6 @@ fn repair_tag_stack(content: &str) -> String {
     let mut result = String::with_capacity(content.len());
     let mut stack: Vec<String> = Vec::new();
     let mut i = 0;
-    let void_elements = [
-        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
-        "source", "track", "wbr",
-    ];
 
     while i < chars.len() {
         if chars[i] != '<' || i + 1 >= chars.len() {
@@ -313,18 +309,8 @@ fn repair_tag_stack(content: &str) -> String {
             result.extend(chars[start..end].iter());
             i = end;
 
-            if !name.is_empty()
-                && !self_closing
-                && !void_elements.contains(&name.as_str())
-                && name != "xml"
-                && name != "DOCTYPE"
-            {
+            if !name.is_empty() && !self_closing && name != "xml" && name != "DOCTYPE" {
                 stack.push(name);
-            } else if !name.is_empty() && !self_closing && void_elements.contains(&name.as_str()) {
-                // 空元素没有自闭合，在 > 前插入 / 使其成为合法的自闭合标签
-                // 此时 result 以 > 结尾（刚 extend 了完整标签），在最后一个 > 前插入
-                let insert_pos = result.len() - 1;
-                result.insert(insert_pos, '/');
             }
         }
     }

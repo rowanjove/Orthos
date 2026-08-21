@@ -168,7 +168,7 @@ mod sample_fix_tests {
     fn yaml_basic_sample() {
         assert_fixes_to_valid(
             "yaml",
-            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
+            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
         );
     }
 
@@ -183,16 +183,23 @@ mod sample_fix_tests {
     }
 
     #[test]
-    fn yaml_duplicate_keys() {
-        assert_fixes_to_valid("yaml", "name: first\nname: second");
+    fn yaml_duplicate_keys_are_preserved() {
+        let input = "name: first\nname: second";
+        let fixed = super::simple_fix(input, "yaml");
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "yaml");
+        assert!(!result.valid);
+        assert!(result.corrected.is_none());
     }
 
     #[test]
-    fn yaml_duplicate_keys_nested() {
-        assert_fixes_to_valid(
-            "yaml",
-            "server:\n  host: localhost\n  host: 0.0.0.0\n  port: 8080",
-        );
+    fn yaml_duplicate_keys_nested_are_preserved() {
+        let input = "server:\n  host: localhost\n  host: 0.0.0.0\n  port: 8080";
+        let fixed = super::simple_fix(input, "yaml");
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "yaml");
+        assert!(!result.valid);
+        assert!(result.corrected.is_none());
     }
 
     #[test]
@@ -219,7 +226,7 @@ mod sample_fix_tests {
     fn yaml_mixed_issues() {
         assert_fixes_to_valid(
             "yaml",
-            "app:MyApp\nversion:1.0\ntabs:\n\t- a\n\t- b\ndup: first\ndup: second\nflow: [x,y,z]",
+            "app:MyApp\nversion:1.0\ntabs:\n\t- a\n\t- b\ndup: first\ndup2: second\nflow: [x,y,z]",
         );
     }
 
@@ -244,7 +251,7 @@ mod sample_fix_tests {
     fn user_broken_toml_sample_fixes_to_valid() {
         assert_fixes_to_valid(
             "toml",
-            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug = false\nbad key = \"needs quotes\"\nmessage = \"hello",
+            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug_enabled = false\nbad key = \"needs quotes\"\nmessage = \"hello",
         );
     }
 
@@ -252,7 +259,7 @@ mod sample_fix_tests {
     fn user_broken_yaml_sample_fixes_to_valid() {
         assert_fixes_to_valid(
             "yaml",
-            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}",
+            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}",
         );
     }
 
@@ -284,7 +291,7 @@ mod sample_fix_tests {
     fn toml_basic_sample() {
         assert_fixes_to_valid(
             "toml",
-            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug = false\nbad key = \"needs quotes\"\nmessage = \"hello\n",
+            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug_enabled = false\nbad key = \"needs quotes\"\nmessage = \"hello\n",
         );
     }
 
@@ -302,13 +309,23 @@ mod sample_fix_tests {
     }
 
     #[test]
-    fn toml_duplicate_keys() {
-        assert_fixes_to_valid("toml", "name = \"first\"\nname = \"second\"");
+    fn toml_duplicate_keys_are_preserved() {
+        let input = "name = \"first\"\nname = \"second\"";
+        let fixed = super::simple_fix(input, "toml");
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "toml");
+        assert!(!result.valid);
+        assert!(result.corrected.is_none());
     }
 
     #[test]
-    fn toml_duplicate_keys_in_section() {
-        assert_fixes_to_valid("toml", "[server]\nhost = \"a\"\nhost = \"b\"\nport = 8080");
+    fn toml_duplicate_keys_in_section_are_preserved() {
+        let input = "[server]\nhost = \"a\"\nhost = \"b\"\nport = 8080";
+        let fixed = super::simple_fix(input, "toml");
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "toml");
+        assert!(!result.valid);
+        assert!(result.corrected.is_none());
     }
 
     #[test]
@@ -353,7 +370,7 @@ mod sample_fix_tests {
     fn toml_mixed_issues() {
         assert_fixes_to_valid(
             "toml",
-            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug = false",
+            "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug_enabled = false",
         );
     }
 
@@ -403,6 +420,13 @@ mod sample_fix_tests {
     }
 
     #[test]
+    fn xml_void_named_element_uses_generic_xml_rules() {
+        let fixed = super::simple_fix("<root><br></root>", "xml");
+        assert_eq!(fixed, "<root><br></br></root>");
+        assert_fixes_to_valid("xml", &fixed);
+    }
+
+    #[test]
     fn xml_nested_unclosed() {
         assert_fixes_to_valid("xml", "<root><a><b>text</a></root>");
     }
@@ -428,7 +452,7 @@ mod sample_fix_tests {
     fn csv_basic_sample() {
         assert_fixes_to_valid(
             "csv",
-            "name,age,email\nAlice,30,alice@example.com\nBob,25,bob@example.com,extra-column\nCharlie,40\n中文用户,28,zh@example.com,\n",
+            "name,age,email\nAlice,30,alice@example.com\nBob,25,bob@example.com\nCharlie,40,\n中文用户,28,zh@example.com\n",
         );
     }
 
@@ -438,8 +462,14 @@ mod sample_fix_tests {
     }
 
     #[test]
-    fn csv_too_many_columns() {
-        assert_fixes_to_valid("csv", "name,age\nAlice,30,extra");
+    fn csv_too_many_columns_are_preserved() {
+        let input = "name,age\nAlice,30,extra";
+        let fixed = super::simple_fix(input, "csv");
+
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "csv");
+        assert!(!result.valid);
+        assert_eq!(result.errors.len(), 1);
     }
 
     #[test]
@@ -483,8 +513,13 @@ mod sample_fix_tests {
     }
 
     #[test]
-    fn csv_trailing_comma() {
-        assert_fixes_to_valid("csv", "name,age,email\nAlice,30,alice@test.com,");
+    fn csv_trailing_extra_field_is_preserved() {
+        let input = "name,age,email\nAlice,30,alice@test.com,";
+        let fixed = super::simple_fix(input, "csv");
+
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "csv");
+        assert!(!result.valid);
     }
 
     #[test]
@@ -498,7 +533,7 @@ mod sample_fix_tests {
     fn ini_basic_sample() {
         assert_fixes_to_valid(
             "ini",
-            "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost=127.0.0.1\n[]\n# comment style to normalize\n",
+            "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
         );
     }
 
@@ -508,8 +543,13 @@ mod sample_fix_tests {
     }
 
     #[test]
-    fn ini_duplicate_keys() {
-        assert_fixes_to_valid("ini", "[server]\nhost = a\nhost = b\nport = 8080");
+    fn ini_duplicate_keys_are_preserved() {
+        let input = "[server]\nhost = a\nhost = b\nport = 8080";
+        let fixed = super::simple_fix(input, "ini");
+        assert_eq!(fixed, input);
+        let result = super::check_format(&fixed, "ini");
+        assert!(!result.valid);
+        assert!(result.corrected.is_none());
     }
 
     #[test]
@@ -622,11 +662,11 @@ mod sample_fix_tests {
             ),
             (
                 "yaml",
-                "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
+                "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
             ),
             (
                 "toml",
-                "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug = false\nbad key = \"needs quotes\"\nmessage = \"hello\n",
+                "[server\nhost=\"localhost\"\nport 8080\ndebug = true\ndebug_enabled = false\nbad key = \"needs quotes\"\nmessage = \"hello\n",
             ),
             (
                 "xml",
@@ -634,11 +674,11 @@ mod sample_fix_tests {
             ),
             (
                 "csv",
-                "name,age,email\nAlice,30,alice@example.com\nBob,25,bob@example.com,extra-column\nCharlie,40\n中文用户,28,zh@example.com,\n",
+                "name,age,email\nAlice,30,alice@example.com\nBob,25,bob@example.com\nCharlie,40,\n中文用户,28,zh@example.com\n",
             ),
             (
                 "ini",
-                "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost=127.0.0.1\n[]\n# comment style to normalize\n",
+                "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
             ),
             (
                 "env",
@@ -720,9 +760,6 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 /// 允许读取和保存文件的目录白名单
 fn get_allowed_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Some(home) = dirs::home_dir() {
-        dirs.push(home);
-    }
     if let Some(desktop) = dirs::desktop_dir() {
         dirs.push(desktop);
     }
@@ -921,11 +958,35 @@ pub fn check_format(content: &str, format: &str) -> CheckResult {
             None,
         ),
     };
+    // Never expose a repair candidate that still fails the format validator.
+    // Individual parsers may produce a best-effort candidate while repairing
+    // multiple independent issues; the UI must not present that candidate as
+    // a downloadable fix.
+    let corrected = corrected.filter(|candidate| format_errors(candidate, format).is_empty());
     CheckResult {
         format: format.to_string(),
         valid: errors.is_empty(),
         errors,
         corrected,
+    }
+}
+
+fn format_errors(content: &str, format: &str) -> Vec<FormatError> {
+    match format {
+        "json" => parsers::json::check(content).0,
+        "yaml" => parsers::yaml::check(content).0,
+        "toml" => parsers::toml::check(content).0,
+        "xml" => parsers::xml::check(content).0,
+        "csv" => parsers::csv::check(content).0,
+        "ini" => parsers::ini::check(content).0,
+        "env" => parsers::env::check(content).0,
+        _ => vec![FormatError {
+            line: None,
+            col: None,
+            near: None,
+            raw: format!("不支持的格式: {}", format),
+            friendly: format!("暂不支持 {} 格式的校验", format),
+        }],
     }
 }
 
@@ -940,7 +1001,7 @@ pub fn check_json_schema(content: &str, schema_str: &str) -> SchemaCheckResult {
             match validator {
                 Ok(v) => {
                     let mut errors = Vec::new();
-                    if let Err(e) = v.validate(&instance) {
+                    for e in v.iter_errors(&instance) {
                         let msg = e.to_string();
                         let path = e.instance_path.to_string();
                         let line = extract_line_from_path(content, &path);
@@ -1026,7 +1087,6 @@ pub fn simple_fix(content: &str, format: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             cmd_read_files,
             cmd_check_file,
@@ -1314,6 +1374,36 @@ mod tests {
     }
 
     #[test]
+    fn schema_reports_all_validation_errors() {
+        let schema = r#"{
+          "type": "object",
+          "required": ["name", "port"],
+          "properties": {
+            "name": {"type": "string"},
+            "port": {"type": "integer"}
+          }
+        }"#;
+        let result = super::check_json_schema(r#"{"name": 42}"#, schema);
+
+        assert!(!result.valid);
+        assert!(
+            result.errors.len() >= 2,
+            "expected all schema errors, got {}",
+            result.errors.len()
+        );
+    }
+
+    #[test]
+    fn schema_external_reference_is_rejected_without_network_access() {
+        let schema = r#"{"$ref":"https://example.com/schema.json"}"#;
+        let result = super::check_json_schema("{}", schema);
+
+        assert!(!result.valid);
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].friendly.contains("Schema 格式无效"));
+    }
+
+    #[test]
     fn simple_fix_command_rejects_oversized_content() {
         let err =
             super::cmd_simple_fix(" ".repeat(super::MAX_FILE_SIZE + 1), "json".into()).unwrap_err();
@@ -1322,11 +1412,14 @@ mod tests {
     }
 
     #[test]
-    fn save_path_allows_new_subdirectory_under_home() {
-        let Some(home) = dirs::home_dir() else {
+    fn save_path_allows_new_subdirectory_under_allowed_dir() {
+        let Some(base) = dirs::desktop_dir()
+            .or_else(dirs::document_dir)
+            .or_else(dirs::download_dir)
+        else {
             return;
         };
-        let target = home
+        let target = base
             .join(format!("lintdrop-new-save-dir-{}", std::process::id()))
             .join("fixed.json");
 
@@ -1335,10 +1428,13 @@ mod tests {
 
     #[test]
     fn save_path_rejects_parent_directory_traversal() {
-        let Some(home) = dirs::home_dir() else {
+        let Some(base) = dirs::desktop_dir()
+            .or_else(dirs::document_dir)
+            .or_else(dirs::download_dir)
+        else {
             return;
         };
-        let target = home.join("..").join("lintdrop-outside.txt");
+        let target = base.join("..").join("lintdrop-outside.txt");
 
         assert!(!super::is_path_allowed(&target));
     }
@@ -1356,7 +1452,7 @@ mod tests {
             .and_then(|name| name.to_str())
             .unwrap()
             .to_string();
-        let files = super::read_files_from_paths(&[path.clone()]).unwrap();
+        let files = super::read_files_from_paths(std::slice::from_ref(&path)).unwrap();
 
         assert_eq!(
             files,
@@ -1365,88 +1461,50 @@ mod tests {
 
         let _ = std::fs::remove_file(path);
     }
-}
 
-
-#[cfg(test)]
-mod user_test_files {
-    use super::*;
-    use std::fs;
     #[test]
-    fn test_all_broken_files() {
-        let test_dir = std::path::Path::new("F:/AI/vibecoding/format-checker/test");
-        let cases = vec![
-            ("broken.json", "json"),
-            ("broken.yaml", "yaml"),
-            ("broken.toml", "toml"),
-            ("broken.xml", "xml"),
-            ("broken.csv", "csv"),
-            ("broken.ini", "ini"),
-            ("broken.env", "env"),
+    fn parser_corpus_is_panic_free_and_repairs_are_valid() {
+        let long_yaml = (0..128)
+            .map(|i| format!("key_{i}: value_{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let corpus = [
+            "",
+            "\u{0}\u{0}\u{0}",
+            "中文 😀 [] {} <> = : ,",
+            "{broken: [1, 2,}",
+            "[section\nkey value\nkey = \"unterminated",
+            "<root><item>text</root>",
+            "name,age\nAlice,30,extra,field",
+            "key: first\nkey: second",
+            long_yaml.as_str(),
         ];
-        for (filename, fmt) in cases {
-            let path = test_dir.join(filename);
-            let content = fs::read_to_string(&path).unwrap_or_else(|e| panic!("Cannot read {}: {}", filename, e));
-            eprintln!("\n=== {} ({}) ===", filename, fmt);
-            // Check original
-            let result = check_format(&content, fmt);
-            eprintln!("  Original errors: {}", result.errors.len());
-            for err in &result.errors {
-                eprintln!("    {}: {}", err.friendly, err.raw);
+        let formats = ["json", "yaml", "toml", "xml", "csv", "ini", "env"];
+
+        for format in formats {
+            for input in corpus {
+                let result = std::panic::catch_unwind(|| super::check_format(input, format));
+                assert!(
+                    result.is_ok(),
+                    "{format} parser panicked for input {:?}",
+                    input
+                );
+
+                let result = result.unwrap();
+                if let Some(corrected) = result.corrected {
+                    let repaired = super::check_format(&corrected, format);
+                    assert!(
+                        repaired.valid,
+                        "{format} exposed an invalid repair for input {:?}: {:?}",
+                        input,
+                        repaired
+                            .errors
+                            .iter()
+                            .map(|error| &error.raw)
+                            .collect::<Vec<_>>()
+                    );
+                }
             }
-            // Fix
-            let fixed = simple_fix(&content, fmt);
-            eprintln!("  Fixed length: {} -> {}", content.len(), fixed.len());
-            // Check fixed
-            let result2 = check_format(&fixed, fmt);
-            eprintln!("  Fixed errors: {}", result2.errors.len());
-            for err in &result2.errors {
-                eprintln!("    {}: {}", err.friendly, err.raw);
-            }
-            if !result2.errors.is_empty() {
-                eprintln!("  FIXED CONTENT:\n{}", fixed);
-            }
-            assert!(result2.errors.is_empty(), "{} fix produced {} errors", filename, result2.errors.len());
         }
     }
 }
-
-#[cfg(test)]
-mod user_test_files_v2 {
-    use super::*;
-    use std::fs;
-    #[test]
-    fn test_all_invalid_files() {
-        let test_dir = std::path::Path::new("F:/AI/vibecoding/format-checker/测试文本");
-        let cases = vec![
-            ("config-invalid.json", "json"),
-            ("docker-invalid.yaml", "yaml"),
-            ("app-invalid.toml", "toml"),
-            ("data-invalid.xml", "xml"),
-            ("students-invalid.csv", "csv"),
-            ("settings-invalid.ini", "ini"),
-            (".env-invalid", "env"),
-        ];
-        for (filename, fmt) in cases {
-            let path = test_dir.join(filename);
-            let content = fs::read_to_string(&path).unwrap_or_else(|e| panic!("Cannot read {}: {}", filename, e));
-            eprintln!("\n=== {} ({}) ===", filename, fmt);
-            let result = check_format(&content, fmt);
-            eprintln!("  Original errors: {}", result.errors.len());
-            for err in &result.errors {
-                eprintln!("    L{}: {}", err.line.unwrap_or(0), err.friendly);
-            }
-            let fixed = simple_fix(&content, fmt);
-            let result2 = check_format(&fixed, fmt);
-            eprintln!("  Fixed errors: {}", result2.errors.len());
-            for err in &result2.errors {
-                eprintln!("    L{}: {}", err.line.unwrap_or(0), err.friendly);
-            }
-            if !result2.errors.is_empty() {
-                eprintln!("  FIXED CONTENT:\n{}", fixed);
-            }
-            assert!(result2.errors.is_empty(), "{} fix FAILED with {} errors", filename, result2.errors.len());
-        }
-    }
-}
-

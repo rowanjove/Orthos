@@ -118,7 +118,7 @@ fn friendly_message(raw: &str) -> String {
 }
 
 /// 全面的 TOML 修正，覆盖以下错误类型：
-/// 1. 重复键名删除（保留第一个）
+/// 1. 重复键名保留原样，由校验阶段报告（避免静默丢失配置）
 /// 2. 未闭合引号补全  "hello → "hello"
 /// 3. 缺失等号  key value → key = value
 /// 4. 等号两侧空格规范化  key=value → key = value
@@ -129,8 +129,6 @@ pub fn simple_fix(content: &str) -> String {
     let content = content.trim_start_matches('\u{feff}');
     let lines: Vec<&str> = content.lines().collect();
     let mut result = Vec::new();
-    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut current_section = String::new();
 
     for line in &lines {
         let trimmed = line.trim();
@@ -143,15 +141,11 @@ pub fn simple_fix(content: &str) -> String {
 
         // 修正 section 头: [section → [section]
         if trimmed.starts_with('[') && !trimmed.starts_with("[[") {
-            if let Some(end) = trimmed.find(']') {
-                current_section = trimmed[1..end].trim().to_string();
-                seen_keys.clear();
+            if trimmed.contains(']') {
                 result.push(line.to_string());
             } else {
                 let section_name = trimmed[1..].trim();
                 result.push(format!("[{}]", section_name));
-                current_section = section_name.to_string();
-                seen_keys.clear();
             }
             continue;
         }
@@ -184,13 +178,6 @@ pub fn simple_fix(content: &str) -> String {
                 key.to_string()
             };
 
-            // 去重
-            let full_key = format!("{}:{}", current_section, fixed_key);
-            if seen_keys.contains(&full_key) {
-                continue;
-            }
-            seen_keys.insert(full_key);
-
             result.push(format!("{} = {}", fixed_key, fixed_value));
             continue;
         }
@@ -213,12 +200,8 @@ pub fn simple_fix(content: &str) -> String {
                         key.to_string()
                     };
                 let fixed_value = fix_unclosed_quotes(value);
-                let full_key = format!("{}:{}", current_section, fixed_key);
-                if !seen_keys.contains(&full_key) {
-                    seen_keys.insert(full_key);
-                    result.push(format!("{} = {}", fixed_key, fixed_value));
-                    continue;
-                }
+                result.push(format!("{} = {}", fixed_key, fixed_value));
+                continue;
             }
         }
 
@@ -240,21 +223,21 @@ pub fn simple_fix(content: &str) -> String {
 fn find_equal_sign(s: &str) -> Option<usize> {
     let mut in_string = false;
     let mut string_char = '"';
-    let chars: Vec<char> = s.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
+    let mut escaped = false;
 
-    while i < len {
-        let ch = chars[i];
+    for (byte_index, ch) in s.char_indices() {
         if in_string {
-            if ch == '\\' && i + 1 < len {
-                i += 2; // 跳过转义字符
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
                 continue;
             }
             if ch == string_char {
                 in_string = false;
             }
-            i += 1;
             continue;
         }
         match ch {
@@ -262,10 +245,9 @@ fn find_equal_sign(s: &str) -> Option<usize> {
                 in_string = true;
                 string_char = ch;
             }
-            '=' => return Some(i),
+            '=' => return Some(byte_index),
             _ => {}
         }
-        i += 1;
     }
     None
 }

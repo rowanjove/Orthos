@@ -95,7 +95,7 @@ pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
 }
 
 /// 全面的 INI 修正，覆盖以下错误类型：
-/// 1. 重复键名删除（保留第一个）
+/// 1. 重复键名保留原样，由校验阶段报告（避免静默丢失配置）
 /// 2. 缺失 section 头的键值对 → 添加默认 [default] section
 /// 3. 缺失等号  key value → key = value
 /// 4. 等号两侧空格规范化  key=value → key = value
@@ -106,9 +106,8 @@ pub fn simple_fix(content: &str) -> String {
     let content = content.trim_start_matches('\u{feff}');
     let lines: Vec<&str> = content.lines().collect();
     let mut result = Vec::new();
-    let mut seen_keys: HashSet<String> = HashSet::new();
-    let mut current_section = String::new();
     let mut has_orphan_keys = false;
+    let mut in_section = false;
 
     // 第一遍：检测是否有孤儿键（没有 section 头的键值对）
     for line in &lines {
@@ -117,13 +116,12 @@ pub fn simple_fix(content: &str) -> String {
             continue;
         }
         if trimmed.starts_with('[') {
+            in_section = true;
             continue;
         }
-        if trimmed.find('=').is_some() {
+        if trimmed.find('=').is_some() && !in_section {
             // 在第一个 section 之前有键值对
-            if current_section.is_empty() {
-                has_orphan_keys = true;
-            }
+            has_orphan_keys = true;
         }
     }
 
@@ -159,9 +157,6 @@ pub fn simple_fix(content: &str) -> String {
                     // 空 section 名 → 跳过
                     continue;
                 }
-                current_section = section.clone();
-                seen_keys.clear();
-
                 // 检查 section 后是否有内容
                 let after = trimmed[end + 1..].trim();
                 if after.is_empty() || after.starts_with(';') || after.starts_with('#') {
@@ -174,11 +169,7 @@ pub fn simple_fix(content: &str) -> String {
                         let key = after[..eq_pos].trim().to_string();
                         let value = after[eq_pos + 1..].trim();
                         if !key.is_empty() {
-                            let full_key = format!("{}:{}", current_section, key);
-                            if !seen_keys.contains(&full_key) {
-                                seen_keys.insert(full_key);
-                                result.push(format!("{} = {}", key, value));
-                            }
+                            result.push(format!("{} = {}", key, value));
                         }
                     }
                 }
@@ -187,13 +178,9 @@ pub fn simple_fix(content: &str) -> String {
                 if let Some(rest) = trimmed.strip_prefix('[') {
                     let section_name = rest.trim();
                     if !section_name.is_empty() {
-                        current_section = section_name.to_string();
-                        seen_keys.clear();
                         result.push(format!("[{}]", section_name));
                     } else {
                         result.push("[default]".to_string());
-                        current_section = "default".to_string();
-                        seen_keys.clear();
                     }
                 }
             }
@@ -209,13 +196,6 @@ pub fn simple_fix(content: &str) -> String {
                 continue; // 跳过空键名
             }
 
-            // 去重
-            let full_key = format!("{}:{}", current_section, key);
-            if seen_keys.contains(&full_key) {
-                continue; // 跳过重复键
-            }
-            seen_keys.insert(full_key);
-
             // 规范化等号两侧空格
             result.push(format!("{} = {}", key, value));
             continue;
@@ -228,12 +208,8 @@ pub fn simple_fix(content: &str) -> String {
             .collect();
         if !key.is_empty() && key.len() < trimmed.len() {
             let rest = trimmed[key.len()..].trim();
-            let full_key = format!("{}:{}", current_section, key);
-            if !seen_keys.contains(&full_key) {
-                seen_keys.insert(full_key);
-                result.push(format!("{} = {}", key, rest));
-                continue;
-            }
+            result.push(format!("{} = {}", key, rest));
+            continue;
         }
 
         result.push(line.to_string());
