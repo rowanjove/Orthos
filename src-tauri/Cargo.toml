@@ -1,6 +1,6 @@
 [package]
 name = "lintdrop"
-version = "1.0.3"
+version = "1.0.4"
 description = "极轻量配置文件格式检查器"
 authors = ["Ryan"]
 edition = "2021"
