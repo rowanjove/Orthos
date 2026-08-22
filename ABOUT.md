@@ -26,7 +26,7 @@ LintDrop focuses on syntax and structure. It can tell whether a file can be pars
 
 ## Version / 版本
 
-1.0.3
+1.0.4
 
 ## Formats / 支持格式
 
