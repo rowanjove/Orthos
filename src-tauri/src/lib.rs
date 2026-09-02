@@ -43,7 +43,7 @@ mod sample_fix_tests {
             "json",
             r#"{
   // comment
-  title: 'LintDrop',
+  title: 'Orthos',
   "version": undefined,
   "items": [
     { "name": "alpha", "count": 1 },
@@ -168,7 +168,7 @@ mod sample_fix_tests {
     fn yaml_basic_sample() {
         assert_fixes_to_valid(
             "yaml",
-            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
+            "app:Orthos\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
         );
     }
 
@@ -236,7 +236,7 @@ mod sample_fix_tests {
             "json",
             r#"{
   // comment: JSON 标准不允许注释
-  title: 'LintDrop',
+  title: 'Orthos',
   "version": undefined,
   "enabled": true,
   "items": [
@@ -259,7 +259,7 @@ mod sample_fix_tests {
     fn user_broken_yaml_sample_fixes_to_valid() {
         assert_fixes_to_valid(
             "yaml",
-            "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}",
+            "app:Orthos\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}",
         );
     }
 
@@ -385,7 +385,7 @@ mod sample_fix_tests {
     fn xml_basic_sample() {
         assert_fixes_to_valid(
             "xml",
-            "<config>\n  <app name=LintDrop>\n    <title>LintDrop</titel>\n    <feature>yaml\n  </app>\n</config>\n",
+            "<config>\n  <app name=Orthos>\n    <title>Orthos</titel>\n    <feature>yaml\n  </app>\n</config>\n",
         );
     }
 
@@ -533,7 +533,7 @@ mod sample_fix_tests {
     fn ini_basic_sample() {
         assert_fixes_to_valid(
             "ini",
-            "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
+            "app_name = Orthos\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
         );
     }
 
@@ -594,7 +594,7 @@ mod sample_fix_tests {
     fn env_basic_sample() {
         assert_fixes_to_valid(
             "env",
-            "APP_NAME=LintDrop\n=missing_key\nPORT 8080\nBAD.KEY=value\nQUOTED=\"missing end\n; semicolon comment\nUNICODE_VALUE=中文内容😀\n",
+            "APP_NAME=Orthos\n=missing_key\nPORT 8080\nBAD.KEY=value\nQUOTED=\"missing end\n; semicolon comment\nUNICODE_VALUE=中文内容😀\n",
         );
     }
 
@@ -652,7 +652,7 @@ mod sample_fix_tests {
                 "json",
                 r#"{
   // comment
-  title: 'LintDrop',
+  title: 'Orthos',
   "version": undefined,
   "items": [
     { "name": "alpha", "count": 1 },
@@ -662,7 +662,7 @@ mod sample_fix_tests {
             ),
             (
                 "yaml",
-                "app:LintDrop\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
+                "app:Orthos\npaths:\n\t- ./config.json\n\t- ./config.yaml\nusers:\n  admin: true\n  admin_enabled: false\nempty_item:\n  -\nflow_list: [1,2,3]\nflow_map: {host:localhost,port:8080}\n",
             ),
             (
                 "toml",
@@ -670,7 +670,7 @@ mod sample_fix_tests {
             ),
             (
                 "xml",
-                "<config>\n  <app name=LintDrop>\n    <title>LintDrop</titel>\n    <feature>yaml\n  </app>\n</config>\n",
+                "<config>\n  <app name=Orthos>\n    <title>Orthos</titel>\n    <feature>yaml\n  </app>\n</config>\n",
             ),
             (
                 "csv",
@@ -678,11 +678,11 @@ mod sample_fix_tests {
             ),
             (
                 "ini",
-                "app_name = LintDrop\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
+                "app_name = Orthos\n[server\nhost=localhost\nport 8080\nhost_backup=127.0.0.1\n[]\n# comment style to normalize\n",
             ),
             (
                 "env",
-                "APP_NAME=LintDrop\n=missing_key\nPORT 8080\nBAD.KEY=value\nQUOTED=\"missing end\n; semicolon comment\nUNICODE_VALUE=中文内容😀\n",
+                "APP_NAME=Orthos\n=missing_key\nPORT 8080\nBAD.KEY=value\nQUOTED=\"missing end\n; semicolon comment\nUNICODE_VALUE=中文内容😀\n",
             ),
         ];
 
@@ -1331,7 +1331,7 @@ mod tests {
 
     #[test]
     fn heuristic_keeps_json_arrays_as_json() {
-        let content = "[{\"name\":\"LintDrop\"}]";
+        let content = "[{\"name\":\"Orthos\"}]";
 
         assert_eq!(
             super::detect_format_heuristic(content).as_deref(),
@@ -1420,7 +1420,7 @@ mod tests {
             return;
         };
         let target = base
-            .join(format!("lintdrop-new-save-dir-{}", std::process::id()))
+            .join(format!("orthos-new-save-dir-{}", std::process::id()))
             .join("fixed.json");
 
         assert!(super::is_path_allowed(&target));
@@ -1434,7 +1434,7 @@ mod tests {
         else {
             return;
         };
-        let target = base.join("..").join("lintdrop-outside.txt");
+        let target = base.join("..").join("orthos-outside.txt");
 
         assert!(!super::is_path_allowed(&target));
     }
@@ -1442,10 +1442,10 @@ mod tests {
     #[test]
     fn dropped_file_reader_accepts_arbitrary_user_selected_path() {
         let path = std::env::temp_dir().join(format!(
-            "lintdrop-dropped-file-reader-{}.json",
+            "orthos-dropped-file-reader-{}.json",
             std::process::id()
         ));
-        std::fs::write(&path, "{\"name\":\"LintDrop\"}").unwrap();
+        std::fs::write(&path, "{\"name\":\"Orthos\"}").unwrap();
 
         let expected_name = path
             .file_name()
@@ -1456,7 +1456,7 @@ mod tests {
 
         assert_eq!(
             files,
-            vec![(expected_name, "{\"name\":\"LintDrop\"}".to_string())]
+            vec![(expected_name, "{\"name\":\"Orthos\"}".to_string())]
         );
 
         let _ = std::fs::remove_file(path);

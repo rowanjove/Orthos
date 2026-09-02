@@ -2,7 +2,7 @@
 chcp 65001 >nul 2>&1
 
 echo ============================================
-echo  LintDrop - Build Environment Setup
+echo  Orthos - Build Environment Setup
 echo ============================================
 echo.
 

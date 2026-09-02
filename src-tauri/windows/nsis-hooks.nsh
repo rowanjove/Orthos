@@ -1,5 +1,5 @@
-!define LINTDROP_UNINSTALL_ICON "${__FILEDIR__}\..\icons\uninstall.ico"
-!define MUI_UNICON "${LINTDROP_UNINSTALL_ICON}"
+!define ORTHOS_UNINSTALL_ICON "${__FILEDIR__}\..\icons\uninstall.ico"
+!define MUI_UNICON "${ORTHOS_UNINSTALL_ICON}"
 
 !macro NSIS_HOOK_POSTINSTALL
   ; 写入注册表图标路径

@@ -94,7 +94,7 @@
     computeLCSGreedy,
   };
 
-  root.LintDropDiff = api;
+  root.OrthosDiff = api;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }

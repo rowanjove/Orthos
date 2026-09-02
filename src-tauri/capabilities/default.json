@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default permissions for LintDrop",
+  "description": "Default permissions for Orthos",
   "windows": ["main"],
   "permissions": [
     "core:default",

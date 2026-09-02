@@ -1,12 +1,12 @@
 [package]
-name = "lintdrop"
-version = "1.0.4"
-description = "极轻量配置文件格式检查器"
+name = "orthos"
+version = "1.1.0"
+description = "离线配置文件检查与安全修复工具"
 authors = ["Ryan"]
 edition = "2021"
 
 [lib]
-name = "lintdrop_lib"
+name = "orthos_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]

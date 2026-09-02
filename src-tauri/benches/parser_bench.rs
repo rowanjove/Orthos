@@ -3,8 +3,8 @@ use std::time::Instant;
 
 fn main() {
     let cases = [
-        ("json", r#"{"name":"LintDrop","items":[1,2,3,]}"#),
-        ("yaml", "app: LintDrop\nitems:\n  - one\n  - two\n"),
+        ("json", r#"{"name":"Orthos","items":[1,2,3,]}"#),
+        ("yaml", "app: Orthos\nitems:\n  - one\n  - two\n"),
         ("toml", "[server\nport 8080\nmessage = \"hello\n"),
         ("xml", "<root><item>text</root>"),
         ("csv", "name,age\nAlice,30,extra\n"),
@@ -17,11 +17,11 @@ fn main() {
 
     for _ in 0..iterations {
         for (format, content) in cases {
-            let result = lintdrop_lib::check_format(black_box(content), black_box(format));
+            let result = orthos_lib::check_format(black_box(content), black_box(format));
             output_bytes += result.errors.len();
             if let Some(corrected) = result.corrected {
                 output_bytes +=
-                    lintdrop_lib::simple_fix(black_box(&corrected), black_box(format)).len();
+                    orthos_lib::simple_fix(black_box(&corrected), black_box(format)).len();
             }
         }
     }

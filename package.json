@@ -1,7 +1,7 @@
 {
-  "name": "lintdrop",
-  "version": "1.0.4",
-  "description": "极轻量配置文件格式检查器",
+  "name": "orthos",
+  "version": "1.1.0",
+  "description": "离线配置文件检查与安全修复工具",
   "scripts": {
     "tauri": "tauri",
     "test:frontend": "node --test test/frontend-diff.test.js test/frontend-shell.test.js",

@@ -1,10 +1,10 @@
-// LintDrop - Main JavaScript
+// Orthos - Main JavaScript
 const tauri = window.__TAURI__;
 const invoke = tauri?.core?.invoke ?? (async () => {
-  throw new Error('请在 LintDrop 桌面应用中使用此功能');
+  throw new Error('请在 Orthos 桌面应用中使用此功能');
 });
 const listen = tauri?.event?.listen ?? (() => Promise.resolve(() => {}));
-const { computeLCS, MAX_RENDER_LINES } = window.LintDropDiff;
+const { computeLCS, MAX_RENDER_LINES } = window.OrthosDiff;
 
 // State
 let currentFiles = {};
