@@ -523,9 +523,13 @@ function formatLocation(err) {
 }
 
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  if (text == null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function detectFormatFromContent(text) {
@@ -534,15 +538,22 @@ function detectFormatFromContent(text) {
   if (trimmed.startsWith('[')) return detectBracketedFormat(trimmed);
   if (trimmed.startsWith('<')) return 'xml';
   if (trimmed.startsWith('---') || trimmed.includes('\n---\n')) return 'yaml';
-  // TOML: 有 section [header] 且有 key = value
-  if (trimmed.split('\n').some(l => {
-    const t = l.trim();
-    return t.startsWith('[') && t.includes(']');
-  }) && trimmed.includes('=') && !trimmed.includes('{')) {
-    return 'toml';
+
+  const lines = trimmed.split('\n');
+  const hasSection = lines.some((line) => {
+    const t = line.trim();
+    return t.startsWith('[') && t.includes(']') && !t.startsWith('[{');
+  });
+
+  if (hasSection) {
+    if (looksLikeIni(lines)) return 'ini';
+    if (lines.some((line) => line.includes('='))) return 'toml';
+    return 'ini';
   }
-  if (trimmed.includes(': ') || trimmed.split('\n').some(l => l.trim().startsWith('- '))) return 'yaml';
-  if (trimmed.includes(',') && trimmed.split('\n').length > 1) return 'csv';
+
+  if (trimmed.startsWith('#') && trimmed.includes('=')) return 'env';
+  if (trimmed.includes(': ') || lines.some((l) => l.trim().startsWith('- '))) return 'yaml';
+  if (trimmed.includes(',') && lines.length > 1) return 'csv';
   if (trimmed.includes('=') && !trimmed.includes('{')) return 'env';
   return 'txt';
 }

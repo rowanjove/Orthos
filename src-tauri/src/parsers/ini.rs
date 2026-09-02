@@ -1,10 +1,11 @@
 use crate::FormatError;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
     let content = content.trim_start_matches('\u{feff}');
     let mut errors = Vec::new();
-    let mut seen_keys: HashSet<String> = HashSet::new();
+    let mut section_keys: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut current_section = String::new();
 
     for (i, line) in content.lines().enumerate() {
         let trimmed = line.trim();
@@ -25,7 +26,7 @@ pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
                         friendly: "section 名称不能为空".into(),
                     });
                 }
-                seen_keys.clear();
+                current_section = section;
                 let after = trimmed[end + 1..].trim();
                 if !after.is_empty() && !after.starts_with(';') && !after.starts_with('#') {
                     errors.push(FormatError {
@@ -58,16 +59,23 @@ pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
                     raw: "空的键名".into(),
                     friendly: format!("第 {} 行等号左边没有键名", i + 1),
                 });
-            } else if seen_keys.contains(&key) {
-                errors.push(FormatError {
-                    line: Some((i + 1) as u32),
-                    col: None,
-                    near: Some(key.clone()),
-                    raw: format!("重复的键名: {}", key),
-                    friendly: format!("第 {} 行键名 \"{}\" 在当前 section 中已存在", i + 1, key),
-                });
             } else {
-                seen_keys.insert(key);
+                let keys = section_keys.entry(current_section.clone()).or_default();
+                if keys.contains(&key) {
+                    errors.push(FormatError {
+                        line: Some((i + 1) as u32),
+                        col: None,
+                        near: Some(key.clone()),
+                        raw: format!("重复的键名: {}", key),
+                        friendly: format!(
+                            "第 {} 行键名 \"{}\" 在当前 section 中已存在",
+                            i + 1,
+                            key
+                        ),
+                    });
+                } else {
+                    keys.insert(key);
+                }
             }
         } else {
             errors.push(FormatError {

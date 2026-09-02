@@ -12,7 +12,16 @@ pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
         }
 
         if let Some(eq_pos) = trimmed.find('=') {
-            let key = trimmed[..eq_pos].trim();
+            let raw_key = trimmed[..eq_pos].trim();
+            let (_is_export, key) = if let Some(rest) = raw_key.strip_prefix("export") {
+                if rest.starts_with(char::is_whitespace) {
+                    (true, rest.trim())
+                } else {
+                    (false, raw_key)
+                }
+            } else {
+                (false, raw_key)
+            };
 
             if key.is_empty() {
                 errors.push(FormatError {
@@ -148,19 +157,42 @@ pub fn simple_fix(content: &str) -> String {
 
         // 缺失等号 → 添加 = 和空值
         if !trimmed.contains('=') {
-            let key: String = trimmed
+            let (is_export, raw_key) = if let Some(rest) = trimmed.strip_prefix("export") {
+                if rest.starts_with(char::is_whitespace) {
+                    (true, rest.trim())
+                } else {
+                    (false, trimmed)
+                }
+            } else {
+                (false, trimmed)
+            };
+            let key: String = raw_key
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
                 .collect();
             if !key.is_empty() {
-                result.push(format!("{}=", key));
+                if is_export {
+                    result.push(format!("export {}=", key));
+                } else {
+                    result.push(format!("{}=", key));
+                }
             }
             continue;
         }
 
         if let Some(eq_pos) = trimmed.find('=') {
-            let raw_key = &trimmed[..eq_pos];
+            let raw_prefix = trimmed[..eq_pos].trim();
             let raw_value = &trimmed[eq_pos + 1..];
+
+            let (is_export, raw_key) = if let Some(rest) = raw_prefix.strip_prefix("export") {
+                if rest.starts_with(char::is_whitespace) {
+                    (true, rest.trim())
+                } else {
+                    (false, raw_prefix)
+                }
+            } else {
+                (false, raw_prefix)
+            };
 
             // 修正键名：移除非法字符
             let key: String = raw_key
@@ -178,7 +210,11 @@ pub fn simple_fix(content: &str) -> String {
             // 修正未闭合引号
             let fixed_value = fix_unclosed_quotes_env(value);
 
-            result.push(format!("{}={}", key, fixed_value));
+            if is_export {
+                result.push(format!("export {}={}", key, fixed_value));
+            } else {
+                result.push(format!("{}={}", key, fixed_value));
+            }
             continue;
         }
 

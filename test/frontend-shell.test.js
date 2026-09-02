@@ -31,3 +31,17 @@ test('frontend invoke commands are registered by the Rust backend', () => {
     assert.ok(registered.has(command), `${command} is called by the frontend but not registered by Rust`);
   }
 });
+
+test('escapeHtml safely encodes attribute-breaking characters', () => {
+  const main = fs.readFileSync(mainPath, 'utf8');
+  const fnCode = main.match(/function escapeHtml\(text\) \{[\s\S]*?\n\}/)[0];
+  const escapeHtml = new Function(`${fnCode}; return escapeHtml;`)();
+
+  assert.equal(
+    escapeHtml('<div class="test" data-id=\'1\'>&'),
+    '&lt;div class=&quot;test&quot; data-id=&#39;1&#39;&gt;&amp;',
+  );
+  assert.equal(escapeHtml(null), '');
+  assert.equal(escapeHtml(undefined), '');
+});
+

@@ -158,20 +158,43 @@ fn fix_unquoted_attributes(content: &str) -> String {
             continue;
         }
 
-        while i < chars.len() && chars[i] != '>' {
+        let mut in_quote: Option<char> = None;
+        while i < chars.len() {
+            let ch = chars[i];
+            if let Some(q) = in_quote {
+                if ch == q {
+                    in_quote = None;
+                }
+                result.push(ch);
+                i += 1;
+                continue;
+            }
+
+            if ch == '"' || ch == '\'' {
+                in_quote = Some(ch);
+                result.push(ch);
+                i += 1;
+                continue;
+            }
+
             // 检查自闭合标签 />
-            if chars[i] == '/' && i + 1 < chars.len() && chars[i + 1] == '>' {
+            if ch == '/' && i + 1 < chars.len() && chars[i + 1] == '>' {
                 break;
             }
-            if chars[i] == '=' && i + 1 < chars.len() {
+            if ch == '>' {
+                break;
+            }
+
+            if ch == '=' && i + 1 < chars.len() {
                 result.push('=');
                 i += 1;
                 if i < chars.len() && chars[i].is_whitespace() {
                     while i < chars.len() && chars[i].is_whitespace() {
+                        result.push(chars[i]);
                         i += 1;
                     }
                 }
-                if i < chars.len() && chars[i] != '"' && chars[i] != '\'' {
+                if i < chars.len() && chars[i] != '"' && chars[i] != '\'' && chars[i] != '>' {
                     result.push('"');
                     while i < chars.len()
                         && chars[i] != '>'
@@ -186,7 +209,7 @@ fn fix_unquoted_attributes(content: &str) -> String {
                 }
                 continue;
             }
-            result.push(chars[i]);
+            result.push(ch);
             i += 1;
         }
 
@@ -298,9 +321,29 @@ fn repair_tag_stack(content: &str) -> String {
             }
             // 跳过属性部分，找到 > 或 />
             let mut self_closing = false;
-            while i < chars.len() && chars[i] != '>' {
-                if chars[i] == '/' && i + 1 < chars.len() && chars[i + 1] == '>' {
+            let mut in_quote: Option<char> = None;
+            while i < chars.len() {
+                let ch = chars[i];
+                if let Some(q) = in_quote {
+                    if ch == q {
+                        in_quote = None;
+                    }
+                    i += 1;
+                    continue;
+                }
+
+                if ch == '"' || ch == '\'' {
+                    in_quote = Some(ch);
+                    i += 1;
+                    continue;
+                }
+
+                if ch == '/' && i + 1 < chars.len() && chars[i + 1] == '>' {
                     self_closing = true;
+                    i += 1; // 消费 '/'，外层闭合到 '>'
+                    break;
+                }
+                if ch == '>' {
                     break;
                 }
                 i += 1;

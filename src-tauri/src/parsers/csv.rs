@@ -1,11 +1,75 @@
 use crate::FormatError;
 
+#[derive(Debug, Clone)]
+struct CsvRecord<'a> {
+    line_number: u32,
+    content: &'a str,
+}
+
+fn split_csv_records(content: &str) -> Vec<CsvRecord<'_>> {
+    let mut records = Vec::new();
+    let mut in_quotes = false;
+    let mut record_start = 0;
+    let mut record_line = 1u32;
+    let mut current_line = 1u32;
+
+    let mut chars = content.char_indices().peekable();
+    while let Some((idx, ch)) = chars.next() {
+        match ch {
+            '"' => {
+                if in_quotes {
+                    if chars.peek().map(|&(_, next_ch)| next_ch) == Some('"') {
+                        chars.next();
+                    } else {
+                        in_quotes = false;
+                    }
+                } else {
+                    in_quotes = true;
+                }
+            }
+            '\n' => {
+                current_line += 1;
+                if !in_quotes {
+                    let end = if idx > 0 && content.as_bytes()[idx - 1] == b'\r' {
+                        idx - 1
+                    } else {
+                        idx
+                    };
+                    records.push(CsvRecord {
+                        line_number: record_line,
+                        content: &content[record_start..end],
+                    });
+                    record_start = idx + 1;
+                    record_line = current_line;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if record_start < content.len() {
+        let remaining = &content[record_start..];
+        let end = if remaining.ends_with('\r') {
+            remaining.len() - 1
+        } else {
+            remaining.len()
+        };
+        records.push(CsvRecord {
+            line_number: record_line,
+            content: &remaining[..end],
+        });
+    }
+
+    records
+}
+
 pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
     let content = content.trim_start_matches('\u{feff}');
     let mut errors = Vec::new();
-    let lines: Vec<&str> = content.lines().collect();
+    let records = split_csv_records(content);
 
-    if lines.is_empty() {
+    let header_record = records.iter().find(|r| !r.content.trim().is_empty());
+    let Some(header) = header_record else {
         errors.push(FormatError {
             line: None,
             col: None,
@@ -14,31 +78,36 @@ pub fn check(content: &str) -> (Vec<FormatError>, Option<String>) {
             friendly: "CSV 文件内容为空".into(),
         });
         return (errors, None);
-    }
+    };
 
-    let header_count = count_fields(lines[0]);
+    let header_count = count_fields(header.content);
 
-    for (i, line) in lines.iter().enumerate().skip(1) {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let count = count_fields(line);
+    for rec in records
+        .iter()
+        .filter(|r| !r.content.trim().is_empty())
+        .skip(1)
+    {
+        let count = count_fields(rec.content);
         if count != header_count {
-            let near = if line.len() > 40 {
-                line.chars().take(40).collect::<String>().trim().to_string()
+            let single_line = rec.content.replace('\n', " ").replace('\r', "");
+            let near = if single_line.chars().count() > 40 {
+                single_line
+                    .chars()
+                    .take(40)
+                    .collect::<String>()
+                    .trim()
+                    .to_string()
             } else {
-                line.trim().to_string()
+                single_line.trim().to_string()
             };
             errors.push(FormatError {
-                line: Some((i + 1) as u32),
+                line: Some(rec.line_number),
                 col: None,
                 near: Some(near),
                 raw: format!("列数不一致: 期望 {} 列，实际 {} 列", header_count, count),
                 friendly: format!(
                     "第 {} 行有 {} 列，但表头有 {} 列，列数不一致",
-                    i + 1,
-                    count,
-                    header_count
+                    rec.line_number, count, header_count
                 ),
             });
         }
@@ -116,75 +185,64 @@ pub fn simple_fix(content: &str) -> String {
 
 /// 修正未闭合的引号
 fn fix_unclosed_quotes_csv(content: &str) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut result = Vec::new();
+    let mut result = String::with_capacity(content.len() + 2);
+    let mut in_quotes = false;
+    let mut chars = content.chars().peekable();
 
-    for line in &lines {
-        if line.trim().is_empty() {
-            result.push(line.to_string());
-            continue;
-        }
-
-        let mut fixed = String::with_capacity(line.len());
-        let mut in_quotes = false;
-        let mut chars = line.chars().peekable();
-
-        while let Some(ch) = chars.next() {
-            match ch {
-                '"' => {
-                    if in_quotes {
-                        if chars.peek() == Some(&'"') {
-                            fixed.push('"');
-                            chars.next();
-                            fixed.push('"');
-                        } else {
-                            in_quotes = false;
-                            fixed.push('"');
-                        }
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' => {
+                if in_quotes {
+                    if chars.peek() == Some(&'"') {
+                        result.push('"');
+                        chars.next();
+                        result.push('"');
                     } else {
-                        in_quotes = true;
-                        fixed.push('"');
+                        in_quotes = false;
+                        result.push('"');
                     }
+                } else {
+                    in_quotes = true;
+                    result.push('"');
                 }
-                _ => fixed.push(ch),
             }
+            _ => result.push(ch),
         }
-
-        if in_quotes {
-            fixed.push('"');
-        }
-
-        result.push(fixed);
     }
 
-    result.join("\n")
+    if in_quotes {
+        result.push('"');
+    }
+
+    result
 }
 
-/// 移除空行
+/// 移除空记录
 fn remove_empty_lines(content: &str) -> String {
-    content
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect::<Vec<&str>>()
+    let records = split_csv_records(content);
+    records
+        .into_iter()
+        .filter(|r| !r.content.trim().is_empty())
+        .map(|r| r.content)
+        .collect::<Vec<_>>()
         .join("\n")
 }
 
 /// 检测并修正错误分隔符（尊重引号内的内容）
 fn fix_wrong_delimiter(content: &str) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    if lines.is_empty() {
+    let records = split_csv_records(content);
+    if records.is_empty() {
         return content.to_string();
     }
 
-    // 统计各种分隔符在引号外出现的次数
     let mut tab_count = 0;
     let mut semicolon_count = 0;
     let mut pipe_count = 0;
     let mut comma_count = 0;
 
-    for line in &lines {
+    for rec in &records {
         let mut in_quotes = false;
-        let mut chars = line.chars().peekable();
+        let mut chars = rec.content.chars().peekable();
         while let Some(ch) = chars.next() {
             match ch {
                 '"' => {
@@ -245,29 +303,32 @@ fn fix_wrong_delimiter(content: &str) -> String {
     result
 }
 
-/// 补齐缺少字段，但保留多余字段，避免修复过程丢失数据。
+/// 补齐缺少字段，但保留多余字段，避免修复过程丢失数据
 fn pad_missing_columns(content: &str) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    if lines.is_empty() {
+    let records = split_csv_records(content);
+    if records.is_empty() {
         return content.to_string();
     }
 
-    let header_count = count_fields(lines[0]);
+    let Some(header) = records.iter().find(|r| !r.content.trim().is_empty()) else {
+        return content.to_string();
+    };
+    let header_count = count_fields(header.content);
     let mut result = Vec::new();
 
-    for line in &lines {
-        if line.trim().is_empty() {
+    for rec in &records {
+        if rec.content.trim().is_empty() {
             continue;
         }
-        let count = count_fields(line);
+        let count = count_fields(rec.content);
         if count < header_count {
-            let mut fixed = line.to_string();
+            let mut fixed = rec.content.to_string();
             for _ in 0..(header_count - count) {
                 fixed.push(',');
             }
             result.push(fixed);
         } else {
-            result.push(line.to_string());
+            result.push(rec.content.to_string());
         }
     }
 

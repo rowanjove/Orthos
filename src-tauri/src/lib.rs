@@ -843,14 +843,19 @@ pub fn detect_format_heuristic(content: &str) -> Option<String> {
         Some("xml".into())
     } else if trimmed.starts_with("---") || trimmed.contains("\n---\n") {
         Some("yaml".into())
-    } else if trimmed.starts_with('#') && trimmed.contains('=') {
-        Some("env".into())
     } else if trimmed.lines().any(|l| {
         let t = l.trim();
-        t.starts_with('[') && t.contains(']')
-    }) && trimmed.lines().any(|l| l.contains('='))
-    {
-        Some("toml".into())
+        t.starts_with('[') && t.contains(']') && !t.starts_with("[{")
+    }) {
+        if looks_like_ini(trimmed) {
+            Some("ini".into())
+        } else if trimmed.lines().any(|l| l.contains('=')) {
+            Some("toml".into())
+        } else {
+            Some("ini".into())
+        }
+    } else if trimmed.starts_with('#') && trimmed.contains('=') {
+        Some("env".into())
     } else if trimmed.lines().any(|l| {
         let t = l.trim();
         t.contains(": ") && !t.starts_with('#')
@@ -858,11 +863,6 @@ pub fn detect_format_heuristic(content: &str) -> Option<String> {
         Some("yaml".into())
     } else if trimmed.contains(',') && trimmed.lines().count() > 1 {
         Some("csv".into())
-    } else if trimmed.lines().any(|l| {
-        let t = l.trim();
-        t.starts_with('[') && t.contains(']')
-    }) {
-        Some("ini".into())
     } else if trimmed.contains('=') {
         Some("env".into())
     } else {
@@ -937,9 +937,8 @@ fn is_ini_bare_value(value: &str) -> bool {
     value.chars().any(|c| c.is_alphabetic())
 }
 
-/// Check format, returns CheckResult with errors and optional corrected version
-pub fn check_format(content: &str, format: &str) -> CheckResult {
-    let (errors, corrected) = match format {
+fn run_parser(content: &str, format: &str) -> (Vec<FormatError>, Option<String>) {
+    match format {
         "json" => parsers::json::check(content),
         "yaml" => parsers::yaml::check(content),
         "toml" => parsers::toml::check(content),
@@ -957,11 +956,13 @@ pub fn check_format(content: &str, format: &str) -> CheckResult {
             }],
             None,
         ),
-    };
+    }
+}
+
+/// Check format, returns CheckResult with errors and optional corrected version
+pub fn check_format(content: &str, format: &str) -> CheckResult {
+    let (errors, corrected) = run_parser(content, format);
     // Never expose a repair candidate that still fails the format validator.
-    // Individual parsers may produce a best-effort candidate while repairing
-    // multiple independent issues; the UI must not present that candidate as
-    // a downloadable fix.
     let corrected = corrected.filter(|candidate| format_errors(candidate, format).is_empty());
     CheckResult {
         format: format.to_string(),
@@ -972,22 +973,7 @@ pub fn check_format(content: &str, format: &str) -> CheckResult {
 }
 
 fn format_errors(content: &str, format: &str) -> Vec<FormatError> {
-    match format {
-        "json" => parsers::json::check(content).0,
-        "yaml" => parsers::yaml::check(content).0,
-        "toml" => parsers::toml::check(content).0,
-        "xml" => parsers::xml::check(content).0,
-        "csv" => parsers::csv::check(content).0,
-        "ini" => parsers::ini::check(content).0,
-        "env" => parsers::env::check(content).0,
-        _ => vec![FormatError {
-            line: None,
-            col: None,
-            near: None,
-            raw: format!("不支持的格式: {}", format),
-            friendly: format!("暂不支持 {} 格式的校验", format),
-        }],
-    }
+    run_parser(content, format).0
 }
 
 /// Check JSON against a JSON Schema
@@ -1506,5 +1492,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn csv_multiline_quoted_field() {
+        let content = "name,desc,age\nAlice,\"hello\nworld\",30\nBob,\"simple\",25";
+        let (errors, _) = parsers::csv::check(content);
+        assert!(
+            errors.is_empty(),
+            "CSV multiline field was rejected: {:?}",
+            errors
+        );
+    }
+
+    #[test]
+    fn xml_attribute_with_greater_than() {
+        let content = "<root><item expr=\"a > b\" count='c > d'/></root>";
+        let fixed = parsers::xml::simple_fix(content);
+        let (errors, _) = parsers::xml::check(&fixed);
+        assert!(
+            errors.is_empty(),
+            "XML attribute with > was corrupted: {}",
+            fixed
+        );
+    }
+
+    #[test]
+    fn env_export_prefix() {
+        let content = "export APP_PORT=8080\nexport DATABASE_URL=\"postgres://localhost\"\n";
+        let (errors, _) = parsers::env::check(content);
+        assert!(
+            errors.is_empty(),
+            "ENV with export prefix had errors: {:?}",
+            errors
+        );
+        let fixed = parsers::env::simple_fix(content);
+        assert!(fixed.contains("export APP_PORT=8080"));
+    }
+
+    #[test]
+    fn ini_duplicate_keys_across_split_sections() {
+        let content = "[server]\nhost = a\n[database]\nname = mydb\n[server]\nhost = b\n";
+        let (errors, _) = parsers::ini::check(content);
+        assert!(
+            !errors.is_empty(),
+            "INI should detect duplicate keys across split sections"
+        );
+        assert!(errors.iter().any(|e| e.raw.contains("重复的键名")));
+    }
+
+    #[test]
+    fn heuristic_detects_ini_with_comment_header() {
+        let content = "# Global configuration\n[database]\nhost = localhost\nport = 5432\n";
+        assert_eq!(
+            super::detect_format_heuristic(content).as_deref(),
+            Some("ini")
+        );
     }
 }
