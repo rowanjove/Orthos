@@ -8,7 +8,7 @@ Orthos is a local Windows desktop validator for JSON, YAML, TOML, XML, CSV, INI,
 
 [![CI](https://github.com/rowanjove/Orthos/actions/workflows/ci.yml/badge.svg)](https://github.com/rowanjove/Orthos/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/rowanjove/Orthos)](https://github.com/rowanjove/Orthos/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 ## Download and use
 
@@ -68,4 +68,4 @@ The full check includes frontend tests and syntax checks, Rustfmt, Clippy, Rust 
 
 ## License
 
-Orthos is open source under the [MIT License](LICENSE).
+Orthos is open source under the [Apache-2.0 License](LICENSE).
