@@ -2,39 +2,16 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  quality:
-    name: Frontend and Rust quality
-    runs-on: windows-latest
-    timeout-minutes: 20
+  rust:
+    uses: rowanjove/.github/.github/workflows/rust-ci.yml@main
+    with:
+      working-directory: src-tauri
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Run quality gate
-        run: npm run check
+  node:
+    uses: rowanjove/.github/.github/workflows/node-ci.yml@main
