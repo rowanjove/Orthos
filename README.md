@@ -8,7 +8,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/rowanjove/Orthos)](https://github.com/rowanjove/Orthos/releases/latest)
 ![Orthos 核心界面：配置文件检查与修复工作台](docs/images/orthos-main.png)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 Orthos 是一款面向开发与运维人员的 **100% 纯本地离线** 配置文件校验工具。
 
@@ -68,4 +68,4 @@ npx tauri build --bundles nsis
 
 ## 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源。
+本项目采用 [Apache-2.0 License](LICENSE) 开源。
