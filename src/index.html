@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orthos - 配置检查</title>
+  <title>Orthos - 本地结构化配置工作台</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,9 +14,12 @@
     </div>
     <div class="header-text">
       <h1>Orthos</h1>
-      <p class="subtitle">检查配置，改完再保存</p>
+      <p class="subtitle">本地结构化配置检查与可视化编辑工作台</p>
     </div>
-    <button id="btn-about" class="btn btn-outline btn-sm header-about">关于</button>
+    <div class="header-actions">
+      <button id="btn-guide" class="btn btn-outline btn-sm header-guide">功能指引</button>
+      <button id="btn-about" class="btn btn-outline btn-sm header-about">关于</button>
+    </div>
   </header>
 
   <!-- Drop Zone -->
@@ -28,10 +31,24 @@
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
     </div>
-    <p class="drop-text">把文件拖到这里</p>
-    <p class="drop-hint">也可以点击选择，或直接粘贴一段内容</p>
-    <button id="btn-paste" class="btn btn-outline">粘贴一段配置</button>
-    <div class="format-badges">
+    <p class="drop-text">拖拽配置文件至此处</p>
+    <p class="drop-hint">支持选取本地文件、从剪贴板导入，或直接载入预置格式示例体验</p>
+    
+    <div class="drop-actions">
+      <button id="btn-paste" class="btn btn-outline">剪贴板导入</button>
+      <button id="btn-quick-sample" class="btn btn-primary">体验示例配置</button>
+    </div>
+
+    <!-- Quick sample chips -->
+    <div class="sample-chips-row">
+      <span class="sample-chips-label">快速体验格式：</span>
+      <div id="sample-chips-list" class="sample-chips-list"></div>
+      <select id="sample-select-dropdown" class="sample-select-dropdown">
+        <option value="">更多格式示例 (15+)...</option>
+      </select>
+    </div>
+
+    <div id="format-badges" class="format-badges">
       <span class="badge">JSON</span>
       <span class="badge">YAML</span>
       <span class="badge">TOML</span>
@@ -41,17 +58,49 @@
       <span class="badge">ENV</span>
     </div>
     <input type="file" id="file-input" multiple hidden
-           accept=".json,.yaml,.yml,.toml,.xml,.csv,.ini,.env,.txt">
+           accept=".json,.yaml,.yml,.toml,.xml,.csv,.ini,.env,.jsonc,.json5,.jsonl,.ndjson,.tsv,.properties,.editorconfig,.gitconfig,.hcl,.tf,.txt">
+  </div>
+
+  <!-- Onboarding Guide Modal -->
+  <div id="guide-modal" class="modal hidden">
+    <div class="modal-overlay" id="guide-overlay"></div>
+    <div class="modal-content guide-modal-content">
+      <div class="guide-header">
+        <h3 id="guide-title">Orthos 功能指引</h3>
+        <span id="guide-step-badge" class="badge">1 / 4</span>
+      </div>
+      <div id="guide-body" class="guide-body"></div>
+      <div class="guide-footer">
+        <button id="btn-guide-sample" class="btn btn-outline btn-sm">载入示例立即体验</button>
+        <div class="guide-nav">
+          <button id="btn-guide-prev" class="btn btn-outline btn-sm" disabled>上一步</button>
+          <button id="btn-guide-next" class="btn btn-primary btn-sm">下一步</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Samples Picker Modal -->
+  <div id="samples-modal" class="modal hidden">
+    <div class="modal-overlay" id="samples-overlay"></div>
+    <div class="modal-content samples-modal-content">
+      <div class="samples-modal-header">
+        <h3>格式配置示例库 (15+ 种)</h3>
+        <button id="btn-samples-close" class="btn-close">&times;</button>
+      </div>
+      <p class="drop-hint" style="margin-bottom: 12px;">点击任意示例，将在新标签页中载入并体验对应模式的校验与编辑能力：</p>
+      <div id="samples-grid" class="samples-grid"></div>
+    </div>
   </div>
 
   <!-- Paste Modal -->
   <div id="paste-modal" class="modal hidden">
     <div class="modal-overlay"></div>
     <div class="modal-content">
-      <h3>粘贴一段配置</h3>
-      <textarea id="paste-input" rows="10" placeholder="把 JSON、YAML、TOML 等内容粘贴到这里"></textarea>
+      <h3>剪贴板导入</h3>
+      <textarea id="paste-input" rows="10" placeholder="在此粘贴 JSON、YAML、TOML、CSV、INI 等配置内容..."></textarea>
       <div class="modal-row">
-        <label>按格式检查：</label>
+        <label>配置格式：</label>
         <select id="paste-format">
           <option value="auto">自动检测</option>
           <option value="json">JSON</option>
@@ -65,7 +114,7 @@
       </div>
       <div class="modal-actions">
         <button id="btn-paste-cancel" class="btn btn-outline">取消</button>
-        <button id="btn-paste-confirm" class="btn btn-primary">检查这段内容</button>
+        <button id="btn-paste-confirm" class="btn btn-primary">确认导入</button>
       </div>
     </div>
   </div>
@@ -74,20 +123,20 @@
   <div id="download-modal" class="modal hidden">
     <div class="modal-overlay" id="download-overlay"></div>
     <div class="modal-content">
-      <h3>保存修正后的文件</h3>
+      <h3>保存文件</h3>
       <div class="modal-row">
         <label>文件名：</label>
         <input type="text" id="download-filename" class="input" style="flex:1">
       </div>
       <div class="modal-row" style="margin-top:8px">
-        <label>保存到：</label>
-        <input type="text" id="download-path" class="input" style="flex:1" placeholder="例如: %USERPROFILE%\Desktop">
-        <button id="btn-browse" class="btn btn-outline btn-sm">选择文件夹</button>
+        <label>保存位置：</label>
+        <input type="text" id="download-path" class="input" style="flex:1" placeholder="默认保存至当前用户桌面">
+        <button id="btn-browse" class="btn btn-outline btn-sm">浏览文件夹</button>
       </div>
-      <p class="drop-hint" style="margin-top:8px;font-size:11px">不填保存位置，就放到桌面</p>
+      <p class="drop-hint" style="margin-top:8px;font-size:11px">留空将保存至当前用户桌面</p>
       <div class="modal-actions">
         <button id="btn-download-cancel" class="btn btn-outline">取消</button>
-        <button id="btn-download-confirm" class="btn btn-primary">保存</button>
+        <button id="btn-download-confirm" class="btn btn-primary">确认保存</button>
       </div>
     </div>
   </div>
@@ -96,12 +145,12 @@
   <div id="schema-modal" class="modal hidden">
     <div class="modal-overlay" id="schema-overlay"></div>
     <div class="modal-content">
-      <h3>用 JSON Schema 继续检查</h3>
-      <textarea id="schema-input" rows="9" placeholder="把 JSON Schema 粘贴到这里"></textarea>
+      <h3>JSON Schema 规范校验与表单生成</h3>
+      <textarea id="schema-input" rows="9" placeholder="在此粘贴标准 JSON Schema 定义..."></textarea>
       <div id="schema-result" class="schema-result hidden"></div>
       <div class="modal-actions">
         <button id="btn-schema-cancel" class="btn btn-outline">取消</button>
-        <button id="btn-schema-confirm" class="btn btn-primary">运行检查</button>
+        <button id="btn-schema-confirm" class="btn btn-primary">执行校验并启用表单</button>
       </div>
     </div>
   </div>
@@ -112,18 +161,17 @@
     <div class="modal-content about-content">
       <h3>关于 Orthos</h3>
       <section>
-        <h4>中文</h4>
-        <p>Orthos 只做一件事：帮你尽快确认配置文件能不能解析。</p>
-        <p>把文件拖进来，或粘贴一段内容；它会指出具体位置，提供安全的修正建议。原文件不会被覆盖。</p>
+        <h4>产品定位</h4>
+        <p>Orthos：本地结构化配置检查、修复与可视化编辑工作台。</p>
+        <p>全面支持 15+ 种配置格式（JSON、YAML、TOML、XML、CSV、INI、ENV、JSONC、JSON5、TSV、Properties、EditorConfig、GitConfig、HCL 等）。具备代码双向同步、结构树、表格矩阵、键值对、XML DOM、Profile 语义规则诊断与 Schema 动态表单生成能力。</p>
       </section>
       <section>
-        <h4>English</h4>
-        <p>Orthos answers one practical question: can this configuration be parsed?</p>
-        <p>Drop a file or paste a snippet to see what needs attention. Your original file stays untouched until you choose to save a fix.</p>
+        <h4>安全承诺</h4>
+        <p>100% 离线运行，零网络请求。配置文件与凭据严格保留在用户本地环境，无数据外传风险。</p>
       </section>
-      <p class="about-version">版本 1.1.0 · 离线运行</p>
+      <p class="about-version">Orthos v2.0.0 · Local First</p>
       <div class="modal-actions">
-        <button id="btn-about-close" class="btn btn-primary">知道了</button>
+        <button id="btn-about-close" class="btn btn-primary">关闭</button>
       </div>
     </div>
   </div>
@@ -132,11 +180,26 @@
   <div id="results" class="results hidden">
     <!-- Single file mode -->
     <div id="single-view">
+      <!-- Multi-tab File Bar -->
+      <div id="file-tabs-bar" class="file-tabs-bar hidden">
+        <div id="file-tabs-list" class="file-tabs-list"></div>
+        <button id="btn-tab-new" class="btn-tab-new" title="新建空白配置">+</button>
+      </div>
+
       <div class="file-info-bar">
         <span id="file-ext" class="file-ext">JSON</span>
         <span id="file-name" class="file-name">config.json</span>
         <span id="file-size" class="file-size">2 KB</span>
-        <button id="btn-close" class="btn-close" title="关闭">&times;</button>
+        <span id="file-dirty" class="file-dirty hidden">● 已修改</span>
+        <span id="file-profile" class="file-profile hidden">Profile: package.json</span>
+        <span id="file-large-warning" class="badge badge-warning hidden">大文件降级模式</span>
+        <div class="workbench-tabs">
+          <button id="tab-code" class="tab-btn active" title="代码编辑模式">代码编辑</button>
+          <button id="tab-visual" class="tab-btn" title="结构化可视化编辑">可视化编辑</button>
+          <button id="tab-form" class="tab-btn hidden" title="基于 Schema 动态表单">表单编辑</button>
+          <button id="tab-diff" class="tab-btn" title="查看改动差异">差异对比</button>
+        </div>
+        <button id="btn-close" class="btn-close" title="关闭当前文件">&times;</button>
       </div>
 
       <div id="status-card" class="status-card status-ok">
@@ -149,26 +212,91 @@
 
       <!-- Action Buttons -->
       <div id="action-bar" class="action-bar">
+        <button id="btn-quick-fix" class="btn btn-primary btn-sm hidden">自动修复</button>
+        <button id="btn-open-samples" class="btn btn-outline btn-sm">载入示例</button>
+        <button id="btn-format-doc" class="btn btn-outline btn-sm">一键排版</button>
         <button id="btn-copy-errors" class="btn btn-outline btn-sm">复制问题</button>
-        <button id="btn-copy-raw" class="btn btn-outline btn-sm">复制原文</button>
-        <button id="btn-schema" class="btn btn-outline btn-sm">Schema 检查</button>
-        <button id="btn-download" class="btn btn-primary btn-sm">保存修正文件</button>
+        <button id="btn-copy-raw" class="btn btn-outline btn-sm">复制文本</button>
+        <button id="btn-schema" class="btn btn-outline btn-sm">Schema 校验</button>
+        <button id="btn-download" class="btn btn-primary btn-sm">保存文件</button>
       </div>
 
-      <!-- Diff Panel -->
+      <!-- Mode 1: Code Editor View -->
+      <div id="code-panel" class="editor-view-panel">
+        <div class="editor-pane-header">
+          <span>代码编辑器 (支持实时语法校验与 Ctrl+S 保存)</span>
+          <span id="code-cursor-pos" class="editor-meta-info">第 1 行, 第 1 列</span>
+        </div>
+        <div class="code-editor-wrapper">
+          <div id="code-gutter" class="code-gutter"></div>
+          <textarea id="code-editor" class="code-editor" spellcheck="false" placeholder="在此编辑配置..."></textarea>
+        </div>
+      </div>
+
+      <!-- Mode 2: Visual Editor View -->
+      <div id="visual-panel" class="editor-view-panel hidden">
+        <div id="visual-frozen-banner" class="visual-frozen-banner hidden">
+          <span class="warning-icon">⚠️</span>
+          <div class="warning-text">
+            <strong>配置存在语法错误，可视化编辑已安全冻结</strong>
+            <p>已保留最新合法的解析快照。请在代码编辑器中修正语法错误，恢复合法后自动恢复双向同步。</p>
+          </div>
+          <button id="btn-goto-fix-syntax" class="btn btn-outline btn-sm">定位至代码视图</button>
+        </div>
+        <div class="visual-toolbar">
+          <div class="visual-toolbar-left">
+            <button id="btn-visual-undo" class="btn btn-outline btn-xs" title="撤销 (Ctrl+Z)" disabled>撤销</button>
+            <button id="btn-visual-redo" class="btn btn-outline btn-xs" title="重做 (Ctrl+Y)" disabled>重做</button>
+            <span class="toolbar-divider"></span>
+            <button id="btn-visual-expand-all" class="btn btn-outline btn-xs">展开全部</button>
+            <button id="btn-visual-collapse-all" class="btn btn-outline btn-xs">折叠全部</button>
+            <button id="btn-visual-add-root" class="btn btn-outline btn-xs">+ 添加项</button>
+          </div>
+          <div class="visual-toolbar-right">
+            <span id="visual-format-badge" class="badge">JSON</span>
+            <span id="visual-node-count" class="editor-meta-info">0 个节点</span>
+          </div>
+        </div>
+        <div id="visual-tree-container" class="visual-content-container"></div>
+      </div>
+
+      <!-- Mode 3: Schema Form Editor View -->
+      <div id="form-panel" class="editor-view-panel hidden">
+        <div class="form-toolbar">
+          <div class="form-toolbar-left">
+            <span class="editor-meta-info">基于 JSON Schema 自动生成的交互式结构表单</span>
+          </div>
+          <div class="form-toolbar-right">
+            <button id="btn-form-clear-schema" class="btn btn-outline btn-xs">退出表单模式</button>
+          </div>
+        </div>
+        <div id="schema-form-container" class="schema-form-container"></div>
+      </div>
+
+      <!-- Mode 4: Diff Panel -->
       <div id="diff-panel" class="diff-panel hidden">
         <div class="diff-header">
-          <span>改动预览</span>
+          <div class="diff-header-left">
+            <span>改动差异预览</span>
+          </div>
+          <div class="diff-mode-toggle">
+            <button id="btn-diff-mode-text" class="btn btn-outline btn-xs active">文本差异 Text Diff</button>
+            <button id="btn-diff-mode-semantic" class="btn btn-outline btn-xs">语义差异 Semantic Diff</button>
+          </div>
         </div>
-        <div class="diff-body">
+        <div id="diff-text-body" class="diff-body">
           <div class="diff-col">
-            <div class="diff-col-header">原文</div>
+            <div class="diff-col-header">已保存版本 (原文)</div>
             <pre id="diff-before" class="diff-code"></pre>
           </div>
           <div class="diff-col">
-            <div class="diff-col-header">修正后</div>
+            <div class="diff-col-header">当前修改版本</div>
             <pre id="diff-after" class="diff-code"></pre>
           </div>
+        </div>
+        <div id="diff-semantic-body" class="diff-semantic-body hidden">
+          <div id="diff-semantic-summary" class="diff-semantic-summary"></div>
+          <div id="diff-semantic-list" class="diff-semantic-list"></div>
         </div>
       </div>
 
@@ -187,7 +315,7 @@
         <h3>批量检查结果</h3>
         <div class="batch-actions">
           <button id="btn-batch-copy" class="btn btn-outline btn-sm">复制全部问题</button>
-          <button id="btn-batch-download" class="btn btn-primary btn-sm">保存全部修正</button>
+          <button id="btn-batch-download" class="btn btn-primary btn-sm">批量保存修正</button>
           <button id="btn-batch-clear" class="btn btn-outline btn-sm">清空列表</button>
         </div>
       </div>
@@ -215,10 +343,11 @@
 
   <!-- Status Bar -->
   <footer id="status-bar" class="status-bar">
-    <span>准备好了</span>
+    <span>就绪</span>
   </footer>
 
   <script src="diff.js"></script>
+  <script src="samples.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

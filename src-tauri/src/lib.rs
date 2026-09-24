@@ -1,10 +1,13 @@
+pub mod document;
+pub mod formats;
 mod parsers;
+pub mod profiles;
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormatError {
     pub line: Option<u32>,
     pub col: Option<u32>,
@@ -809,24 +812,7 @@ fn nearest_existing_ancestor(path: &Path) -> Option<PathBuf> {
 
 /// Detect format from file extension
 pub fn detect_format(filename: &str) -> Option<String> {
-    let name = filename.to_lowercase();
-    if name.ends_with(".json") {
-        Some("json".into())
-    } else if name.ends_with(".yaml") || name.ends_with(".yml") {
-        Some("yaml".into())
-    } else if name.ends_with(".toml") {
-        Some("toml".into())
-    } else if name.ends_with(".xml") {
-        Some("xml".into())
-    } else if name.ends_with(".csv") {
-        Some("csv".into())
-    } else if name.ends_with(".ini") {
-        Some("ini".into())
-    } else if name.ends_with(".env") {
-        Some("env".into())
-    } else {
-        None
-    }
+    formats::get_registry().detect(Some(filename), None)
 }
 
 /// Heuristic format detection from content
@@ -938,15 +924,12 @@ fn is_ini_bare_value(value: &str) -> bool {
 }
 
 fn run_parser(content: &str, format: &str) -> (Vec<FormatError>, Option<String>) {
-    match format {
-        "json" => parsers::json::check(content),
-        "yaml" => parsers::yaml::check(content),
-        "toml" => parsers::toml::check(content),
-        "xml" => parsers::xml::check(content),
-        "csv" => parsers::csv::check(content),
-        "ini" => parsers::ini::check(content),
-        "env" => parsers::env::check(content),
-        _ => (
+    if let Some(adapter) = formats::get_registry().get(format) {
+        let errors = adapter.validate(content);
+        let corrected = adapter.repair(content);
+        (errors, corrected)
+    } else {
+        (
             vec![FormatError {
                 line: None,
                 col: None,
@@ -955,7 +938,7 @@ fn run_parser(content: &str, format: &str) -> (Vec<FormatError>, Option<String>)
                 friendly: format!("暂不支持 {} 格式的校验", format),
             }],
             None,
-        ),
+        )
     }
 }
 
@@ -1058,15 +1041,12 @@ fn extract_line_from_path(content: &str, path: &str) -> Option<u32> {
 
 /// Simple auto-fix based on rules
 pub fn simple_fix(content: &str, format: &str) -> String {
-    match format {
-        "json" => parsers::json::simple_fix(content),
-        "yaml" => parsers::yaml::simple_fix(content),
-        "toml" => parsers::toml::simple_fix(content),
-        "xml" => parsers::xml::simple_fix(content),
-        "csv" => parsers::csv::simple_fix(content),
-        "ini" => parsers::ini::simple_fix(content),
-        "env" => parsers::env::simple_fix(content),
-        _ => content.to_string(),
+    if let Some(adapter) = formats::get_registry().get(format) {
+        adapter
+            .repair(content)
+            .unwrap_or_else(|| content.to_string())
+    } else {
+        content.to_string()
     }
 }
 
@@ -1082,6 +1062,17 @@ pub fn run() {
             cmd_save_file,
             cmd_get_home,
             cmd_get_desktop,
+            cmd_list_formats,
+            cmd_detect_format,
+            cmd_parse_document,
+            cmd_serialize_document,
+            cmd_apply_patch,
+            cmd_format_document,
+            cmd_validate_document,
+            cmd_list_profiles,
+            cmd_detect_profile,
+            cmd_validate_profile,
+            cmd_compute_semantic_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1231,22 +1222,55 @@ fn cmd_simple_fix(content: String, format: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn cmd_save_file(path: String, content: String) -> Result<(), String> {
+fn cmd_save_file(
+    path: Option<String>,
+    filename: Option<String>,
+    content: String,
+    directory: Option<String>,
+) -> Result<String, String> {
     if content.len() > MAX_FILE_SIZE {
         return Err(format!(
             "文件过大，最大支持 {} MB",
             MAX_FILE_SIZE / 1024 / 1024
         ));
     }
-    let target = Path::new(&path);
-    if !is_path_allowed(target) {
-        return Err("不允许保存到该目录，仅支持桌面、文档、下载目录".into());
+
+    let target_path = if let Some(p) = path.filter(|s| !s.trim().is_empty()) {
+        PathBuf::from(p)
+    } else if let Some(fname) = filename.filter(|s| !s.trim().is_empty()) {
+        let base_dir = if let Some(dir) = directory.filter(|s| !s.trim().is_empty()) {
+            PathBuf::from(dir)
+        } else {
+            dirs::desktop_dir()
+                .or_else(dirs::document_dir)
+                .or_else(dirs::download_dir)
+                .unwrap_or_else(|| PathBuf::from("."))
+        };
+        base_dir.join(fname)
+    } else {
+        return Err("未指定文件名或保存路径".into());
+    };
+
+    if !is_path_allowed(&target_path) {
+        if target_path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+        {
+            return Err("路径包含非法相对父路径 (..)".into());
+        }
+        if !target_path.is_absolute() {
+            return Err("不允许保存到该目录，仅支持桌面、文档、下载目录或绝对路径".into());
+        }
     }
+
     // 确保父目录存在
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    if let Some(parent) = target_path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        }
     }
-    fs::write(&path, content).map_err(|e| format!("保存失败: {}", e))
+    fs::write(&target_path, &content).map_err(|e| format!("保存失败: {}", e))?;
+    Ok(target_path.display().to_string())
 }
 
 #[tauri::command]
@@ -1261,6 +1285,166 @@ fn cmd_get_desktop() -> Result<String, String> {
     dirs::desktop_dir()
         .map(|p| p.to_string_lossy().to_string())
         .ok_or_else(|| "无法获取桌面目录".into())
+}
+
+#[tauri::command]
+fn cmd_list_formats() -> Vec<formats::FormatDescriptor> {
+    formats::get_registry().list()
+}
+
+#[tauri::command]
+fn cmd_detect_format(content: Option<String>, filename: Option<String>) -> Option<String> {
+    formats::get_registry().detect(filename.as_deref(), content.as_deref())
+}
+
+#[tauri::command]
+fn cmd_parse_document(content: String, format: String) -> Result<document::DocumentNode, String> {
+    if content.len() > MAX_FILE_SIZE {
+        return Err(format!(
+            "文件过大，最大支持 {} MB",
+            MAX_FILE_SIZE / 1024 / 1024
+        ));
+    }
+    let adapter = formats::get_registry()
+        .get(&format)
+        .ok_or_else(|| format!("不支持的格式: {}", format))?;
+    adapter
+        .parse(&content)
+        .map_err(|e| format!("{}: {}", e.friendly, e.raw))
+}
+
+#[tauri::command]
+fn cmd_serialize_document(node: document::DocumentNode, format: String) -> Result<String, String> {
+    let adapter = formats::get_registry()
+        .get(&format)
+        .ok_or_else(|| format!("不支持的格式: {}", format))?;
+    adapter
+        .serialize(&node)
+        .map_err(|e| format!("{}: {}", e.friendly, e.raw))
+}
+
+#[tauri::command]
+fn cmd_apply_patch(
+    content: String,
+    format: String,
+    patch: document::DocumentPatch,
+) -> Result<document::PatchResult, String> {
+    if content.len() > MAX_FILE_SIZE {
+        return Err(format!(
+            "文件过大，最大支持 {} MB",
+            MAX_FILE_SIZE / 1024 / 1024
+        ));
+    }
+    let adapter = formats::get_registry()
+        .get(&format)
+        .ok_or_else(|| format!("不支持的格式: {}", format))?;
+    let mut doc = adapter
+        .parse(&content)
+        .map_err(|e| format!("解析失败: {}", e.friendly))?;
+
+    document::apply_patch_to_node(&mut doc, &patch)?;
+
+    let serialized = adapter
+        .serialize(&doc)
+        .map_err(|e| format!("序列化失败: {}", e.friendly))?;
+
+    let errors = adapter.validate(&serialized);
+    let valid = errors.is_empty();
+
+    Ok(document::PatchResult {
+        content: serialized,
+        node: doc,
+        valid,
+        errors,
+    })
+}
+
+#[tauri::command]
+fn cmd_format_document(content: String, format: String) -> Result<String, String> {
+    if content.len() > MAX_FILE_SIZE {
+        return Err(format!(
+            "文件过大，最大支持 {} MB",
+            MAX_FILE_SIZE / 1024 / 1024
+        ));
+    }
+    let adapter = formats::get_registry()
+        .get(&format)
+        .ok_or_else(|| format!("不支持的格式: {}", format))?;
+    adapter
+        .format(&content)
+        .map_err(|e| format!("{}: {}", e.friendly, e.raw))
+}
+
+#[tauri::command]
+fn cmd_validate_document(content: String, format: String) -> CheckResult {
+    check_format(&content, &format)
+}
+
+#[tauri::command]
+fn cmd_list_profiles() -> Vec<profiles::ProfileDescriptor> {
+    profiles::get_profile_registry().list()
+}
+
+#[tauri::command]
+fn cmd_detect_profile(
+    filename: String,
+    content: String,
+    format: Option<String>,
+    doc: Option<document::DocumentNode>,
+) -> Option<String> {
+    let document = if let Some(d) = doc {
+        d
+    } else {
+        let fmt = format.unwrap_or_else(|| {
+            formats::get_registry()
+                .detect(Some(&filename), Some(&content))
+                .unwrap_or_else(|| "json".into())
+        });
+        let adapter = formats::get_registry().get(&fmt)?;
+        adapter.parse(&content).ok()?
+    };
+    profiles::get_profile_registry().detect(&filename, &content, &document)
+}
+
+#[tauri::command]
+fn cmd_validate_profile(
+    profile_id: String,
+    content: Option<String>,
+    format: Option<String>,
+    doc: Option<document::DocumentNode>,
+) -> Vec<profiles::ProfileDiagnostic> {
+    let document = if let Some(d) = doc {
+        d
+    } else {
+        let fmt = format.as_deref().unwrap_or("json");
+        let cnt = content.as_deref().unwrap_or("");
+        let Some(adapter) = formats::get_registry().get(fmt) else {
+            return Vec::new();
+        };
+        let Ok(d) = adapter.parse(cnt) else {
+            return Vec::new();
+        };
+        d
+    };
+    profiles::get_profile_registry().validate(&profile_id, &document)
+}
+
+#[tauri::command]
+fn cmd_compute_semantic_diff(
+    old_content: String,
+    new_content: String,
+    format: String,
+) -> Result<document::SemanticDiffResult, String> {
+    let adapter = formats::get_registry()
+        .get(&format)
+        .ok_or_else(|| format!("不支持的格式: {}", format))?;
+    let old_doc = adapter
+        .parse(&old_content)
+        .map_err(|e| format!("原内容解析失败: {}", e.friendly))?;
+    let new_doc = adapter
+        .parse(&new_content)
+        .map_err(|e| format!("新内容解析失败: {}", e.friendly))?;
+    Ok(document::compute_semantic_diff(&old_doc, &new_doc))
 }
 #[cfg(test)]
 mod tests {
@@ -1548,5 +1732,299 @@ mod tests {
             super::detect_format_heuristic(content).as_deref(),
             Some("ini")
         );
+    }
+
+    #[test]
+    fn adapter_contract_all_formats_registered() {
+        let list = super::formats::get_registry().list();
+        assert!(list.len() >= 12);
+        let ids: Vec<&str> = list.iter().map(|f| f.id.as_str()).collect();
+        for expected in [
+            "json",
+            "yaml",
+            "toml",
+            "xml",
+            "csv",
+            "ini",
+            "env",
+            "jsonc",
+            "json5",
+            "jsonl",
+            "tsv",
+            "properties",
+        ] {
+            assert!(ids.contains(&expected), "Missing format: {}", expected);
+        }
+    }
+
+    #[test]
+    fn adapter_contract_json_parse_patch_serialize() {
+        let input = r#"{"server": {"port": 8080, "host": "127.0.0.1"}}"#;
+        let adapter = super::formats::get_registry().get("json").unwrap();
+        let mut doc = adapter.parse(input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+
+        // Apply SetValue patch
+        let patch = super::document::DocumentPatch::SetValue {
+            path: "/server/port".into(),
+            value: 3000.into(),
+        };
+        super::document::apply_patch_to_node(&mut doc, &patch).unwrap();
+
+        let serialized = adapter.serialize(&doc).unwrap();
+        assert!(serialized.contains("3000"));
+        let revalidated = adapter.validate(&serialized);
+        assert!(revalidated.is_empty());
+    }
+
+    #[test]
+    fn adapter_contract_csv_grid_operations() {
+        let input = "name,age\nAlice,30\nBob,25";
+        let adapter = super::formats::get_registry().get("csv").unwrap();
+        let mut doc = adapter.parse(input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Table);
+
+        // Add a row
+        let patch = super::document::DocumentPatch::AddRow {
+            parent_path: "/".into(),
+            index: None,
+            values: vec!["Charlie".into(), "35".into()],
+        };
+        super::document::apply_patch_to_node(&mut doc, &patch).unwrap();
+
+        let serialized = adapter.serialize(&doc).unwrap();
+        assert!(serialized.contains("Charlie,35"));
+    }
+
+    #[test]
+    fn adapter_contract_ini_kv_operations() {
+        let input = "[server]\nhost = localhost\nport = 8080\n";
+        let adapter = super::formats::get_registry().get("ini").unwrap();
+        let doc = adapter.parse(input).unwrap();
+        let serialized = adapter.serialize(&doc).unwrap();
+        assert!(serialized.contains("[server]"));
+        assert!(serialized.contains("host = localhost"));
+    }
+
+    #[test]
+    fn adapter_contract_xml_dom_operations() {
+        let input = r#"<config version="1.0"><server><host>localhost</host></server></config>"#;
+        let adapter = super::formats::get_registry().get("xml").unwrap();
+        let doc = adapter.parse(input).unwrap();
+        let serialized = adapter.serialize(&doc).unwrap();
+        assert!(serialized.contains("<config"));
+        assert!(serialized.contains("version=\"1.0\""));
+    }
+
+    #[test]
+    fn adapter_contract_extension_formats() {
+        // Test JSONC
+        let jsonc_input = "{\n  // comment\n  \"name\": \"orthos\"\n}";
+        let jsonc_adapter = super::formats::get_registry().get("jsonc").unwrap();
+        let doc = jsonc_adapter.parse(jsonc_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+
+        // Test TSV
+        let tsv_input = "col1\tcol2\nval1\tval2";
+        let tsv_adapter = super::formats::get_registry().get("tsv").unwrap();
+        let doc = tsv_adapter.parse(tsv_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Table);
+
+        // Test Properties
+        let prop_input = "app.name = Orthos\napp.port = 8080";
+        let prop_adapter = super::formats::get_registry().get("properties").unwrap();
+        let doc = prop_adapter.parse(prop_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+
+        // Test EditorConfig
+        let ec_input = "root = true\n\n[*]\nindent_style = space\n";
+        let ec_adapter = super::formats::get_registry().get("editorconfig").unwrap();
+        let doc = ec_adapter.parse(ec_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+
+        // Test GitConfig
+        let gc_input = "[user]\nname = Ryan\nemail = ryan@example.com\n";
+        let gc_adapter = super::formats::get_registry().get("gitconfig").unwrap();
+        let doc = gc_adapter.parse(gc_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+
+        // Test HCL
+        let hcl_input = "variable \"region\" {\n  default = \"us-east-1\"\n}\n";
+        let hcl_adapter = super::formats::get_registry().get("hcl").unwrap();
+        let doc = hcl_adapter.parse(hcl_input).unwrap();
+        assert_eq!(doc.kind, super::document::NodeKind::Object);
+    }
+
+    #[test]
+    fn profile_contract_package_json_and_docker_compose() {
+        // package.json detection & semantic validation
+        let pkg_content = r#"{
+          "name": "MyPackage",
+          "version": "1.0",
+          "dependencies": {"react": "^18.0.0"},
+          "devDependencies": {"react": "^18.0.0"}
+        }"#;
+        let json_adapter = super::formats::get_registry().get("json").unwrap();
+        let pkg_doc = json_adapter.parse(pkg_content).unwrap();
+
+        let detected =
+            super::profiles::get_profile_registry().detect("package.json", pkg_content, &pkg_doc);
+        assert_eq!(detected.as_deref(), Some("package.json"));
+
+        let diags = super::profiles::get_profile_registry().validate("package.json", &pkg_doc);
+        assert!(diags.iter().any(|d| d.message.contains("大写字母")));
+        assert!(diags.iter().any(|d| d
+            .message
+            .contains("同时出现在 dependencies 和 devDependencies")));
+
+        // docker-compose duplicate port check
+        let compose_content = r#"
+services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+  api:
+    image: node
+    ports:
+      - "8080:3000"
+"#;
+        let yaml_adapter = super::formats::get_registry().get("yaml").unwrap();
+        let compose_doc = yaml_adapter.parse(compose_content).unwrap();
+        let compose_detected = super::profiles::get_profile_registry().detect(
+            "docker-compose.yml",
+            compose_content,
+            &compose_doc,
+        );
+        assert_eq!(compose_detected.as_deref(), Some("docker-compose"));
+
+        let compose_diags =
+            super::profiles::get_profile_registry().validate("docker-compose", &compose_doc);
+        assert!(compose_diags.iter().any(|d| d.message.contains("冲突")));
+    }
+
+    #[test]
+    fn semantic_diff_computation() {
+        let old_content = r#"{"server": {"port": 8080, "host": "localhost"}, "debug": true}"#;
+        let new_content = r#"{"server": {"port": 3000, "host": "localhost"}, "extra": "new"}"#;
+
+        let diff =
+            super::cmd_compute_semantic_diff(old_content.into(), new_content.into(), "json".into())
+                .unwrap();
+
+        assert_eq!(diff.modified_count, 1); // port changed
+        assert_eq!(diff.added_count, 1); // extra added
+        assert_eq!(diff.removed_count, 1); // debug removed
+        assert_eq!(diff.items.len(), 3);
+    }
+
+    #[test]
+    fn cmd_save_file_supports_filename_and_directory() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("orthos-save-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let filename = "saved-config.json";
+        let content = "{\"test\": true}";
+
+        let saved = super::cmd_save_file(
+            None,
+            Some(filename.into()),
+            content.into(),
+            Some(temp_dir.display().to_string()),
+        )
+        .unwrap();
+
+        let expected_path = temp_dir.join(filename);
+        assert_eq!(saved, expected_path.display().to_string());
+        assert_eq!(std::fs::read_to_string(&expected_path).unwrap(), content);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn cmd_save_file_supports_direct_path() {
+        let temp_file =
+            std::env::temp_dir().join(format!("orthos-direct-save-{}.json", std::process::id()));
+        let content = "{\"direct\": true}";
+
+        let saved = super::cmd_save_file(
+            Some(temp_file.display().to_string()),
+            None,
+            content.into(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(saved, temp_file.display().to_string());
+        assert_eq!(std::fs::read_to_string(&temp_file).unwrap(), content);
+
+        let _ = std::fs::remove_file(temp_file);
+    }
+
+    #[test]
+    fn cmd_detect_and_validate_profile_flexible_args() {
+        let pkg_content = r#"{"name": "BadPackage", "version": "1.0.0"}"#;
+        let detected =
+            super::cmd_detect_profile("package.json".into(), pkg_content.into(), None, None);
+        assert_eq!(detected.as_deref(), Some("package.json"));
+
+        let diags = super::cmd_validate_profile(
+            "package.json".into(),
+            Some(pkg_content.into()),
+            Some("json".into()),
+            None,
+        );
+        assert!(diags.iter().any(|d| d.message.contains("大写字母")));
+    }
+
+    #[test]
+    fn detect_format_recognizes_extended_formats() {
+        assert_eq!(
+            super::detect_format("settings.jsonc").as_deref(),
+            Some("jsonc")
+        );
+        assert_eq!(super::detect_format("app.json5").as_deref(), Some("json5"));
+        assert_eq!(super::detect_format("data.tsv").as_deref(), Some("tsv"));
+        assert_eq!(
+            super::detect_format("config.properties").as_deref(),
+            Some("properties")
+        );
+        assert_eq!(
+            super::detect_format(".editorconfig").as_deref(),
+            Some("editorconfig")
+        );
+        assert_eq!(
+            super::detect_format(".gitconfig").as_deref(),
+            Some("gitconfig")
+        );
+        assert_eq!(super::detect_format("main.tf").as_deref(), Some("hcl"));
+        assert_eq!(
+            super::detect_format("records.ndjson").as_deref(),
+            Some("jsonl")
+        );
+    }
+
+    #[test]
+    fn xml_sibling_path_independence_and_patch() {
+        let xml_input = "<root><item>First</item><item>Second</item></root>";
+        let adapter = super::formats::get_registry().get("xml").unwrap();
+        let mut doc = adapter.parse(xml_input).unwrap();
+
+        // Ensure siblings have distinct paths
+        let children = doc.children.as_ref().unwrap();
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].path, "/item#0");
+        assert_eq!(children[1].path, "/item#1");
+
+        // Remove only the second item
+        let patch = super::document::DocumentPatch::RemoveNode {
+            path: "/item#1".into(),
+        };
+        super::document::apply_patch_to_node(&mut doc, &patch).unwrap();
+
+        assert_eq!(doc.children.as_ref().unwrap().len(), 1);
+        let serialized = adapter.serialize(&doc).unwrap();
+        assert!(serialized.contains("First"));
+        assert!(!serialized.contains("Second"));
     }
 }

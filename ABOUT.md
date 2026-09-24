@@ -2,24 +2,20 @@
 
 ## 中文
 
-Orthos 是一款轻量、离线的桌面配置文件检查器，支持 JSON、YAML、TOML、XML、CSV、INI 和 ENV。
+Orthos 是一款轻量、离线的桌面结构化配置工作台，支持 15+ 种开发与运维常用格式（JSON、JSONC、JSON5、YAML、TOML、XML、CSV、TSV、INI、ENV、Properties、EditorConfig、GitConfig、HCL、JSONL）。
 
-拖入文件或粘贴文本后，Orthos 会识别格式、定位错误并在能够安全推断时生成修正版本。修正不会自动覆盖原文件；用户需要先检查 Diff，再决定是否保存。
+支持拖入文件或粘贴文本，自动识别格式并进行毫秒级语法检查。提供多标签页工作台、代码编辑（行号槽与实时纠错）、可视化树形编辑、Schema 动态表单以及文本与 AST 语义差异对比视图。安全自动修复需要二次通过真实解析器验证方可保存，绝不强制覆盖原文件。
 
-文件内容只在本机处理，不需要账号，也不会上传。Orthos 关注语法和结构，不判断业务字段是否符合具体系统的规则。
-
-Orthos 原名 LintDrop。为保持既有安装升级兼容，应用标识符继续使用 `com.lintdrop.desktop`。
+所有文件内容纯本地离线处理，无需网络、无需账号、不收集隐私，可安全用于包含密码或 API 凭据的机密配置。
 
 ## English
 
-Orthos is a lightweight, offline desktop validator for JSON, YAML, TOML, XML, CSV, INI, and ENV files.
+Orthos is a lightweight, offline desktop workbench for structured configuration files, supporting 15+ common formats (JSON, JSONC, JSON5, YAML, TOML, XML, CSV, TSV, INI, ENV, Properties, EditorConfig, GitConfig, HCL, JSONL).
 
-It detects formats, locates errors, and offers repaired output when a safe correction can be inferred. Repairs never overwrite the original file automatically; review the diff before saving.
+Drag files or paste text to automatically detect formats and validate syntax in milliseconds. Features include a multi-tab workbench, code editor with gutter and real-time linting, visual tree editor, schema-driven forms, and dual-mode text/AST semantic diffs. Automated repairs must pass secondary verification before saving and never overwrite files without confirmation.
 
-Files stay on the local computer. Orthos checks syntax and structure, not application-specific semantics.
-
-Orthos was previously named LintDrop. The identifier `com.lintdrop.desktop` is retained for upgrade compatibility.
+Everything runs locally and offline. No network access, no accounts, and no data collection. Safe for sensitive configurations containing secrets or credentials.
 
 ## Version / 版本
 
-1.1.0
+2.0.0

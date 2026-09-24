@@ -1,12 +1,13 @@
 {
   "name": "orthos",
-  "version": "1.1.0",
-  "description": "离线配置文件检查与安全修复工具",
+  "version": "2.0.0",
+  "description": "本地结构化配置检查与可视化编辑工作台",
   "scripts": {
     "tauri": "tauri",
-    "test:frontend": "node --test test/frontend-diff.test.js test/frontend-shell.test.js",
+    "build": "tauri build",
+    "test:frontend": "node --test test/frontend-diff.test.js test/frontend-shell.test.js test/frontend-workbench.test.js",
     "benchmark:rust": "cargo bench --manifest-path src-tauri/Cargo.toml --bench parser_bench",
-    "check:frontend": "npm run test:frontend && node --check src/main.js && node --check src/diff.js",
+    "check:frontend": "npm run test:frontend && node --check src/main.js && node --check src/diff.js && node --check src/samples.js",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --all-targets && cargo check --manifest-path src-tauri/Cargo.toml",
     "check": "npm run check:frontend && npm run check:rust"
   },

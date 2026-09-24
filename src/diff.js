@@ -87,11 +87,36 @@
     return result;
   }
 
+  function computeLCSMatchSets(a, b) {
+    const lcs = computeLCS(a, b);
+    const beforeMatches = new Set();
+    const afterMatches = new Set();
+
+    let lcsIdxA = 0;
+    for (let i = 0; i < a.length && lcsIdxA < lcs.length; i++) {
+      if (a[i] === lcs[lcsIdxA]) {
+        beforeMatches.add(i);
+        lcsIdxA++;
+      }
+    }
+
+    let lcsIdxB = 0;
+    for (let j = 0; j < b.length && lcsIdxB < lcs.length; j++) {
+      if (b[j] === lcs[lcsIdxB]) {
+        afterMatches.add(j);
+        lcsIdxB++;
+      }
+    }
+
+    return { beforeMatches, afterMatches };
+  }
+
   const api = {
     MAX_EXACT_LCS_CELLS,
     MAX_RENDER_LINES,
     computeLCS,
     computeLCSGreedy,
+    computeLCSMatchSets,
   };
 
   root.OrthosDiff = api;

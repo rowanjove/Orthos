@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
   "productName": "Orthos",
-  "version": "1.1.0",
-  "identifier": "com.lintdrop.desktop",
+  "version": "2.0.0",
+  "identifier": "com.orthos.desktop",
   "build": {
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
@@ -13,11 +13,11 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Orthos - 格式检查器",
-        "width": 900,
-        "height": 650,
-        "minWidth": 700,
-        "minHeight": 500,
+        "title": "Orthos - 本地结构化配置工作台",
+        "width": 960,
+        "height": 680,
+        "minWidth": 760,
+        "minHeight": 520,
         "resizable": true,
         "center": true,
         "dragDropEnabled": true

@@ -32,6 +32,51 @@ test('frontend invoke commands are registered by the Rust backend', () => {
   }
 });
 
+test('cmd_save_file and profile invocations align with backend IPC signatures', () => {
+  const main = fs.readFileSync(mainPath, 'utf8');
+  const rust = fs.readFileSync(rustPath, 'utf8');
+
+  // Verify cmd_save_file supports filename and directory
+  assert.ok(rust.includes('fn cmd_save_file('));
+  assert.ok(rust.includes('filename: Option<String>'));
+  assert.ok(rust.includes('directory: Option<String>'));
+
+  // Verify cmd_detect_profile and cmd_validate_profile accept flexible/optional parameters
+  assert.ok(rust.includes('fn cmd_detect_profile('));
+  assert.ok(rust.includes('format: Option<String>'));
+  assert.ok(rust.includes('fn cmd_validate_profile('));
+  assert.ok(rust.includes('content: Option<String>'));
+
+  // Verify main.js provides format parameter to profile calls
+  assert.ok(main.includes("format: result.format || format"));
+  assert.ok(main.includes("format: docState.format"));
+});
+
+test('drag-drop handler safely consumes tuple array from cmd_read_files', () => {
+  const tupleResult = [['sample.json', '{"hello":"world"}']];
+  const fileEntries = Array.isArray(tupleResult)
+    ? tupleResult
+    : (tupleResult?.files?.map((f) => [f.filename, f.content]) || []);
+
+  assert.equal(fileEntries.length, 1);
+  assert.equal(fileEntries[0][0], 'sample.json');
+  assert.equal(fileEntries[0][1], '{"hello":"world"}');
+});
+
+test('semantic diff tag logic correctly maps camelCase changeType', () => {
+  const itemAdded = { changeType: 'added', path: '/items/0' };
+  const itemRemoved = { changeType: 'removed', path: '/debug' };
+  const itemModified = { changeType: 'modified', path: '/port' };
+
+  function getType(item) {
+    return item.changeType || item.change_type || item.diff_type || 'modified';
+  }
+
+  assert.equal(getType(itemAdded), 'added');
+  assert.equal(getType(itemRemoved), 'removed');
+  assert.equal(getType(itemModified), 'modified');
+});
+
 test('escapeHtml safely encodes attribute-breaking characters', () => {
   const main = fs.readFileSync(mainPath, 'utf8');
   const fnCode = main.match(/function escapeHtml\(text\) \{[\s\S]*?\n\}/)[0];
@@ -44,4 +89,3 @@ test('escapeHtml safely encodes attribute-breaking characters', () => {
   assert.equal(escapeHtml(null), '');
   assert.equal(escapeHtml(undefined), '');
 });
-

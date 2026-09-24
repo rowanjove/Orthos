@@ -5,3 +5,10 @@ tmp-icon-check/
 dist/
 *.log
 *.tmp
+*PRD*
+*prd*
+*.plan.md
+*.spec.md
+superpowers/
+.gemini/
+.agents/
